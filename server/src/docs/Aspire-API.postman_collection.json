@@ -1,0 +1,1972 @@
+{
+  "info": {
+    "name": "Aspire System Management API",
+    "description": "Run **Auth → Sign in** first; the token is saved automatically.\n\nSet `baseUrl` to your server, e.g. http://192.168.20.214:5000\n\nUpdated 17 Nov 2026: Categories, item pictures (form-data), Active/Inactive, reassign, Repairs, global Search.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://192.168.20.214:5000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Sign in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** none (public).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@aspire.com\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Saves the token so every other request is signed in",
+                  "const r = pm.response.json();",
+                  "if (r.token) pm.collectionVariables.set('token', r.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The signed-in user (with effectivePermissions)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Update your own name, phone or designation",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sahil\",\n  \"phone\": \"9876543210\",\n  \"designation\": \"IT Admin\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Change your password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me/password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me",
+                "password"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"Admin@123\",\n  \"newPassword\": \"NewPass@456\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "item": [
+        {
+          "name": "List items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "items"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Matches name, brand, model or sub-category"
+                },
+                {
+                  "key": "category",
+                  "value": "Keyboard",
+                  "disabled": true,
+                  "description": "A category name from GET /api/categories/list, or All"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Active (use this in the app for assignable stock), Inactive, or leave out / All for both"
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page number, from 1. Send it to get a paged result: { data, page, limit, total, totalPages }"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Rows per page with `page` (default 25, max 100)"
+                }
+              ]
+            },
+            "description": "**Permission:** any signed-in user.\n\nPaginated when `page` is sent."
+          }
+        },
+        {
+          "name": "Add an item (JSON, or form-data with an image file)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "items"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\nSend **multipart/form-data** to upload a picture: field `image` = the file (JPG, PNG, WEBP or GIF, max 5 MB), `specs` = a JSON string, all other fields as text. The saved `image` is a path like `/uploads/items/1731.jpg` — show it as `<server>/uploads/items/1731.jpg`. Plain JSON still works.\n\n**Permission:** reading is open to any signed-in user; this change needs `inventory`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dell Latitude 5550\",\n  \"category\": \"System\",\n  \"subCategory\": \"Laptop\",\n  \"brand\": \"Dell\",\n  \"model\": \"Latitude 5550\",\n  \"specs\": {\n    \"Processor\": \"Intel Core i5\",\n    \"RAM\": \"16 GB\",\n    \"Storage\": \"512 GB SSD\"\n  },\n  \"totalQuantity\": 10,\n  \"unit\": \"pcs\",\n  \"unitPrice\": 65000,\n  \"vendor\": \"Dell India\",\n  \"purchaseDate\": \"2026-10-01\",\n  \"warrantyUntil\": \"2029-10-01\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Add an item with a picture (form-data)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "items"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Dell Latitude 5550",
+                  "type": "text"
+                },
+                {
+                  "key": "category",
+                  "value": "System",
+                  "type": "text"
+                },
+                {
+                  "key": "subCategory",
+                  "value": "Laptop",
+                  "type": "text"
+                },
+                {
+                  "key": "brand",
+                  "value": "Dell",
+                  "type": "text"
+                },
+                {
+                  "key": "totalQuantity",
+                  "value": "10",
+                  "type": "text"
+                },
+                {
+                  "key": "unitPrice",
+                  "value": "65000",
+                  "type": "text",
+                  "description": "Required"
+                },
+                {
+                  "key": "specs",
+                  "value": "{\"processor\":\"Intel Core i5\",\"ram\":\"16 GB\"}",
+                  "type": "text",
+                  "description": "JSON string"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Choose the picture (JPG, PNG, WEBP, GIF · max 5 MB)"
+                }
+              ]
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\nSend **multipart/form-data** to upload a picture: field `image` = the file (JPG, PNG, WEBP or GIF, max 5 MB), `specs` = a JSON string, all other fields as text. The saved `image` is a path like `/uploads/items/1731.jpg` — show it as `<server>/uploads/items/1731.jpg`. Plain JSON still works.\n\n**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\nBody → form-data. Pick the file in the `image` row. `specs` is a JSON string."
+          }
+        },
+        {
+          "name": "Category names only (full details: GET /api/categories)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/items/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "items",
+                "categories"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "One item and who currently holds it",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/items/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "items",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Edit an item",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/items/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "items",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\nTotal quantity cannot go below what is currently assigned.\n\n**Permission:** reading is open to any signed-in user; this change needs `inventory`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"totalQuantity\": 12,\n  \"vendor\": \"Dell India\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Edit an item / change its picture (form-data)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/items/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "items",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "totalQuantity",
+                  "value": "10",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Choose the picture (JPG, PNG, WEBP, GIF · max 5 MB)"
+                }
+              ]
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\nTotal quantity cannot go below what is currently assigned.\n\n**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\nBody → form-data. Pick the file in the `image` row. `specs` is a JSON string."
+          }
+        },
+        {
+          "name": "Mark an item Active or Inactive (inventory is never deleted)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/items/{{id}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "items",
+                "{{id}}",
+                "status"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\nInactive items keep their stock and history but cannot be assigned until made Active again. `DELETE /api/items/:id` is not available (405).\n\n**Permission:** reading is open to any signed-in user; this change needs `inventory`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Inactive\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Add stock to an existing item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/items/{{id}}/stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "items",
+                "{{id}}",
+                "stock"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\n\n\n**Permission:** reading is open to any signed-in user; this change needs `inventory`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 5,\n  \"notes\": \"PO-2291 new purchase\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "★ All form data in one call (recommended for the app)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/forms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "forms"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "Keyboard",
+                  "disabled": true,
+                  "description": "Optional — return only this category (any letter case)"
+                }
+              ]
+            },
+            "description": "**Permission:** any signed-in user.\n\nReturns an **array** — one object per category, each containing only its own data:\n\n`name` → Category dropdown · `brands` → Brand dropdown (`brandInput` = `text` means no list, show a text box) · `subCategories[].name` → Sub-category dropdown · `subCategories[].fields` → the inputs to show for that sub-category (`input` = `dropdown` uses `options`, or `text` / `number`).\n\nAdd `?category=Keyboard` to get just that one category (still an array with 1 object).\n\nTip: call it when the app starts and keep the result; call again only to refresh (the server answers **304 Not Modified** when nothing changed if the app sends the `If-None-Match` ETag)."
+          }
+        },
+        {
+          "name": "Step 1 — Category dropdown",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/list",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "list"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user.\n\nNames only, in display order. Use `name` in step 2."
+          }
+        },
+        {
+          "name": "Step 2 & 3 — Sub-categories, brands and spec fields for a category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/form?category=Keyboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "form"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "Keyboard",
+                  "disabled": false,
+                  "description": "Category name (any letter case), e.g. Camera"
+                },
+                {
+                  "key": "subCategory",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional — the chosen sub-category, e.g. CCTV"
+                }
+              ]
+            },
+            "description": "**Permission:** any signed-in user.\n\nCall with `category` after the user picks a category → fill the **Sub-category** dropdown from `subCategories` and the **Brand** dropdown from `brands` (if `brandInput` is `text`, show a text box).\n\nCall again with `subCategory` after the user picks one → `fields` then holds only the inputs for that sub-category. Show one input per field: `input` = `dropdown` (use `options`), `text` or `number`.\n\nSave: `POST /api/items` with `category`, `subCategory`, `brand`, `name`, `totalQuantity` and `specs` = `specsTemplate` filled in.\n\nWithout `subCategory`, `fields` lists every field with `showFor` (`all` or the sub-categories it belongs to)."
+          }
+        },
+        {
+          "name": "All categories with sub-categories, brands and spec fields",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user.\n\nBuild the Add Item form from this: Category dropdown = `name`, Sub-category = `subCategories`, Brand = `brands`, then one input per entry in `fields` (only those whose `appliesTo` is empty or contains the chosen sub-category). Save the answers in the item's `specs` using each field's `key`."
+          }
+        },
+        {
+          "name": "Add a category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\n\n\n**Permission:** reading is open to any signed-in user; this change needs `inventory`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Camera\",\n  \"icon\": \"Other\",\n  \"subCategories\": [\n    \"CCTV\",\n    \"Webcam\"\n  ],\n  \"brands\": [\n    \"Hikvision\",\n    \"Logitech\"\n  ],\n  \"fields\": [\n    {\n      \"label\": \"Resolution\",\n      \"type\": \"select\",\n      \"options\": [\n        \"1080p\",\n        \"4K\"\n      ]\n    },\n    {\n      \"label\": \"Night vision\",\n      \"type\": \"select\",\n      \"options\": [\n        \"Yes\",\n        \"No\"\n      ],\n      \"appliesTo\": [\n        \"CCTV\"\n      ]\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "One category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Edit a category",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\nRenaming also renames the category on its items.\n\n**Permission:** reading is open to any signed-in user; this change needs `inventory`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subCategories\": [\n    \"CCTV\",\n    \"Webcam\",\n    \"Dashcam\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete a category (to Recycle Bin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\nRefused while items use it.\n\n**Permission:** reading is open to any signed-in user; this change needs `inventory`. Also needs `delete`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Employees",
+      "item": [
+        {
+          "name": "List employees (with assignedCount)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "employees"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Employee ID or name"
+                },
+                {
+                  "key": "department",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Department id"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Active or Inactive"
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page number, from 1. Send it to get a paged result: { data, page, limit, total, totalPages }"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Rows per page with `page` (default 25, max 100)"
+                }
+              ]
+            },
+            "description": "**Permission:** any signed-in user.\n\nPaginated when `page` is sent."
+          }
+        },
+        {
+          "name": "Add an employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "employees"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `employees`.\n\nemployeeId is generated (EMP-00001…) when left out.\n\n**Permission:** reading is open to any signed-in user; this change needs `employees`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"EMP-00125\",\n  \"name\": \"Riya Sharma\",\n  \"department\": \"<department _id>\",\n  \"designation\": \"Developer\",\n  \"location\": \"Noida\",\n  \"email\": \"riya@aspireglobus.com\",\n  \"phone\": \"9876543210\",\n  \"status\": \"Active\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Next free Employee ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/employees/next-id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "employees",
+                "next-id"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "One employee with assignments and history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/employees/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "employees",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Edit an employee",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/employees/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "employees",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `employees`.\n\n\n\n**Permission:** reading is open to any signed-in user; this change needs `employees`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"designation\": \"Senior Developer\",\n  \"status\": \"Active\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete an employee (to Recycle Bin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/employees/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "employees",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `employees`.\n\nRefused while they still hold items.\n\n**Permission:** reading is open to any signed-in user; this change needs `employees`. Also needs `delete`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Departments",
+      "item": [
+        {
+          "name": "List departments (with employeeCount and assignedItems)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/departments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "departments"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page number, from 1. Send it to get a paged result: { data, page, limit, total, totalPages }"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Rows per page with `page` (default 25, max 100)"
+                }
+              ]
+            },
+            "description": "**Permission:** any signed-in user.\n\nPaginated when `page` is sent."
+          }
+        },
+        {
+          "name": "Add a department",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/departments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "departments"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `departments`.\n\n\n\n**Permission:** reading is open to any signed-in user; this change needs `departments`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Development\",\n  \"code\": \"DEV\",\n  \"description\": \"Software team\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Edit a department",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/departments/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "departments",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `departments`.\n\n\n\n**Permission:** reading is open to any signed-in user; this change needs `departments`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Development\",\n  \"code\": \"DEV\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete a department (to Recycle Bin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/departments/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "departments",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `departments`.\n\nRefused while it has employees.\n\n**Permission:** reading is open to any signed-in user; this change needs `departments`. Also needs `delete`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Assignments",
+      "item": [
+        {
+          "name": "List assignments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/assignments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "assignments"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Active (still with the employee), Assigned, Partially Returned, Returned or Transferred"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Employee name, Employee ID or item"
+                },
+                {
+                  "key": "item",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Item id"
+                },
+                {
+                  "key": "department",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Department id"
+                },
+                {
+                  "key": "category",
+                  "value": "Keyboard",
+                  "disabled": true,
+                  "description": "Category name, e.g. System"
+                },
+                {
+                  "key": "employee",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Employee id"
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page number, from 1. Send it to get a paged result: { data, page, limit, total, totalPages }"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Rows per page with `page` (default 25, max 100)"
+                }
+              ]
+            },
+            "description": "**Permission:** any signed-in user.\n\nPaginated when `page` is sent."
+          }
+        },
+        {
+          "name": "Assign an item to an employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/assignments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "assignments"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `assignments`.\n\nEither pass `employeeId` (existing employee's Mongo id) **or** `departmentId` + `employeeCode` (+ `employeeName` when the code is new — the employee is then created).\n\n**Permission:** reading is open to any signed-in user; this change needs `assignments`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemId\": \"<item _id>\",\n  \"departmentId\": \"<department _id>\",\n  \"employeeCode\": \"EMP-00125\",\n  \"employeeName\": \"Riya Sharma\",\n  \"designation\": \"Developer\",\n  \"quantity\": 1,\n  \"issueDate\": \"2026-11-05\",\n  \"notes\": \"New joiner\"\n}"
+            }
+          }
+        },
+        {
+          "name": "One assignment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/assignments/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "assignments",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Per department: items out and number of employees",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/assignments/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "assignments",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Active (default), Assigned, Partially Returned or Returned"
+                },
+                {
+                  "key": "category",
+                  "value": "Keyboard",
+                  "disabled": true,
+                  "description": "Category name"
+                },
+                {
+                  "key": "item",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Item id"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Employee name, ID or item"
+                }
+              ]
+            },
+            "description": "**Permission:** any signed-in user.\n\nSame filters as the list (default status=Active). `departments` is sorted by quantity, highest first."
+          }
+        },
+        {
+          "name": "Reassign — move an item straight to another employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/assignments/{{id}}/reassign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "assignments",
+                "{{id}}",
+                "reassign"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `assignments`.\n\nTakes `quantity` (default: everything the current employee holds) back from the current holder and gives it to the new employee in one step. Total stock doesn't change; history shows \"Reassigned from / to\". Send `employeeId` (existing employee) **or** `employeeCode` + `departmentId` (+ `employeeName` for a new ID). Inactive items can't be reassigned.\n\n**Permission:** reading is open to any signed-in user; this change needs `assignments`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeCode\": \"EMP-00126\",\n  \"quantity\": 1,\n  \"date\": \"2026-11-17\",\n  \"notes\": \"Moved to new joiner\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Record a return (full or partial)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/assignments/{{id}}/return",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "assignments",
+                "{{id}}",
+                "return"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `assignments`.\n\n\n\n**Permission:** reading is open to any signed-in user; this change needs `assignments`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 1,\n  \"returnDate\": \"2026-11-20\",\n  \"condition\": \"Damaged\",\n  \"damageType\": \"Screen broken\",\n  \"description\": \"Crack on bottom-left corner\",\n  \"photo\": \"data:image/jpeg;base64,...\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Repairs",
+      "item": [
+        {
+          "name": "List damaged / in repair / repaired / scrapped items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repairs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "repairs"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Damaged, In repair, Repaired, Scrapped (incl. Lost), Done (Repaired + Scrapped + Lost). Empty = all"
+                },
+                {
+                  "key": "from",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Only records closed on/after this date, e.g. first day of the month"
+                },
+                {
+                  "key": "withPhoto",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Send 1 to include the photo (data URL) in each row"
+                },
+                {
+                  "key": "department",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Department id"
+                },
+                {
+                  "key": "item",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Item id"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Item, employee, vendor or damage type"
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page number (opt-in pagination)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Rows per page (max 100)"
+                }
+              ]
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Counts for the cards on the Repairs page",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repairs/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "repairs",
+                "summary"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Vendors used before, most recent first (chips in Send to repair)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repairs/vendors",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "repairs",
+                "vendors"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Dropdown values: damage types, repair by, responsible",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repairs/options",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "repairs",
+                "options"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Report damage or loss",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/repairs/report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "repairs",
+                "report"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\nSend **assignmentId** when an employee has the item (it is taken back from them now), or **itemId** for office stock.\n\n**Permission:** reading is open to any signed-in user; this change needs `inventory`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignmentId\": \"<assignment _id>\",\n  \"quantity\": 1,\n  \"damageType\": \"Screen broken\",\n  \"description\": \"Crack on bottom-left corner\",\n  \"photo\": \"data:image/jpeg;base64,...\"\n}"
+            }
+          }
+        },
+        {
+          "name": "One record (with photo)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repairs/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "repairs",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Send a Damaged item to repair → In repair",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/repairs/{{id}}/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "repairs",
+                "{{id}}",
+                "send"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\n\n\n**Permission:** reading is open to any signed-in user; this change needs `inventory`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vendor\": \"Sharma Computers\",\n  \"estimatedCost\": 3500,\n  \"sentAt\": \"2026-11-17\",\n  \"expectedAt\": \"2026-11-24\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Result: Repaired (back in stock), Not repaired (back to Damaged) or Scrapped (written off)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/repairs/{{id}}/result",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "repairs",
+                "{{id}}",
+                "result"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** reading is open to any signed-in user; this change needs `inventory`.\n\nWorks from Damaged or In repair.\n\n**Permission:** reading is open to any signed-in user; this change needs `inventory`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"outcome\": \"Repaired\",\n  \"finalCost\": 3200,\n  \"date\": \"2026-11-23\",\n  \"notes\": \"Panel replaced\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "Global search (top search bar)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=dell",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "dell",
+                  "disabled": false,
+                  "description": "Text to find, e.g. dell, EMP-0012, rohan, Sharma Computers"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Results per group (1–20, default 5)"
+                }
+              ]
+            },
+            "description": "**Permission:** any signed-in user.\n\nType at least 2 characters. Results are grouped by type, each with a `link` to open it in the web app and `total` = all matches of that type."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Dashboard totals, per-category stock, recent activity, low stock",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "dashboard"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user.\n\nUse **summary**, **categories**, **runningLow** and **recentActivity** — they match the portal Dashboard labels. The other keys are the originals the web portal uses."
+          }
+        },
+        {
+          "name": "All items, sorted by category and name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "stock"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page number, from 1. Send it to get a paged result: { data, page, limit, total, totalPages }"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Rows per page with `page` (default 25, max 100)"
+                }
+              ]
+            },
+            "description": "**Permission:** any signed-in user.\n\nPaginated when `page` is sent."
+          }
+        },
+        {
+          "name": "Quantity held per department and category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/by-department",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "by-department"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Movement history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/activity",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "activity"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Start date YYYY-MM-DD"
+                },
+                {
+                  "key": "to",
+                  "value": "",
+                  "disabled": true,
+                  "description": "End date YYYY-MM-DD"
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "disabled": true,
+                  "description": "ASSIGN, RETURN, STOCK_ADD or STOCK_UPDATE"
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page number, from 1. Send it to get a paged result: { data, page, limit, total, totalPages }"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Rows per page with `page` (default 25, max 100)"
+                }
+              ]
+            },
+            "description": "**Permission:** any signed-in user.\n\nPaginated when `page` is sent."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List login accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page number, from 1. Send it to get a paged result: { data, page, limit, total, totalPages }"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Rows per page with `page` (default 25, max 100)"
+                }
+              ]
+            },
+            "description": "**Permission:** `users`.\n\n\n\n**Permission:** `users` (Administrators always have it). Paginated when `page` is sent."
+          }
+        },
+        {
+          "name": "Create a login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** `users`.\n\nOnly an Administrator can create Administrators.\n\n**Permission:** `users` (Administrators always have it).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Aman Verma\",\n  \"email\": \"aman@aspireglobus.com\",\n  \"password\": \"Staff@123\",\n  \"role\": \"Staff\",\n  \"permissions\": [\n    \"inventory\",\n    \"assignments\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Permission keys and their labels",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/permissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "permissions"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** `users`.\n\n\n\n**Permission:** `users` (Administrators always have it)."
+          }
+        },
+        {
+          "name": "Edit a login / reset password / set permissions",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** `users`.\n\nSend `password` only to reset it.\n\n**Permission:** `users` (Administrators always have it).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Active\",\n  \"permissions\": [\n    \"inventory\",\n    \"assignments\",\n    \"delete\"\n  ],\n  \"password\": \"Reset@123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete a login (to Recycle Bin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** `users`.\n\n\n\n**Permission:** `users` (Administrators always have it)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Change notifications, newest first",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "unread",
+                  "value": "",
+                  "disabled": true,
+                  "description": "true for unread only"
+                },
+                {
+                  "key": "entity",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Item, Assignment, Employee, Department, User or Recycle Bin"
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page number, from 1. Send it to get a paged result: { data, page, limit, total, totalPages }"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Rows per page with `page` (default 25, max 100)"
+                }
+              ]
+            },
+            "description": "**Permission:** `notifications`.\n\n\n\n**Permission:** `notifications` (Administrators always have it). Paginated when `page` is sent."
+          }
+        },
+        {
+          "name": "Unread count (for a badge)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/unread-count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "unread-count"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** `notifications`.\n\n\n\n**Permission:** `notifications` (Administrators always have it)."
+          }
+        },
+        {
+          "name": "Mark one as read",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/{{id}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "{{id}}",
+                "read"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** `notifications`.\n\n\n\n**Permission:** `notifications` (Administrators always have it)."
+          }
+        },
+        {
+          "name": "Mark all as read",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/read-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "read-all"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** `notifications`.\n\n\n\n**Permission:** `notifications` (Administrators always have it)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Recycle Bin",
+      "item": [
+        {
+          "name": "Deleted records",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/trash",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trash"
+              ],
+              "query": [
+                {
+                  "key": "kind",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Item, Employee, Department or User"
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Page number, from 1. Send it to get a paged result: { data, page, limit, total, totalPages } (Recycle Bin keeps its { retentionDays, items } shape and adds page, limit, total, totalPages)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Rows per page with `page` (default 25, max 100)"
+                }
+              ]
+            },
+            "description": "**Permission:** `recycleBin`.\n\n\n\n**Permission:** `recycleBin` (Administrators always have it). Paginated when `page` is sent."
+          }
+        },
+        {
+          "name": "Empty the Recycle Bin (permanent)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/trash",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trash"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** `recycleBin`.\n\n**Administrators only.** Permanent — cannot be undone."
+          }
+        },
+        {
+          "name": "Restore a record",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/trash/{{id}}/restore",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trash",
+                "{{id}}",
+                "restore"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** `recycleBin`.\n\n\n\n**Permission:** `recycleBin` (Administrators always have it)."
+          }
+        },
+        {
+          "name": "Permanently delete one entry",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/trash/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trash",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** `recycleBin`.\n\n**Administrators only.** Staff can delete records (they go to the Recycle Bin) and restore them, but cannot delete permanently."
+          }
+        }
+      ]
+    },
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Server and database status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** none (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
