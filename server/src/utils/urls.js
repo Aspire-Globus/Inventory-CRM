@@ -4,6 +4,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 const store = new AsyncLocalStorage();
 const PICTURE_KEYS = new Set(['image', 'photo']);
+// Default picture for an item without its own (server/public/default-item.png)
+export const DEFAULT_ITEM_IMAGE = '/static/default-item.png';
 
 /** Remember this request's address (http://<host>) while it is handled. */
 export function rememberBaseUrl(req, res, next) {
@@ -12,7 +14,7 @@ export function rememberBaseUrl(req, res, next) {
 
 /** JSON replacer: "/uploads/..." in an image / photo field -> full link for the current request. */
 export function fullPictureUrls(key, value) {
-  if (PICTURE_KEYS.has(key) && typeof value === 'string' && value.startsWith('/uploads/')) {
+  if (PICTURE_KEYS.has(key) && typeof value === 'string' && (value.startsWith('/uploads/') || value.startsWith('/static/'))) {
     const base = store.getStore();
     return base ? base + value : value;
   }

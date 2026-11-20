@@ -2,10 +2,12 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import Repair, { DAMAGE_TYPES, REPAIR_BY } from '../models/Repair.js';
 import Assignment from '../models/Assignment.js';
+import Item from '../models/Item.js';
 import { returnItem } from '../services/stock.js';
 import { closeRepair, details, recordFromReturn, recordFromStock, sendToRepair } from '../services/repairs.js';
 import { notify } from '../services/audit.js';
 import { repairPhoto } from '../middleware/upload.js';
+import { DEFAULT_ITEM_IMAGE } from '../utils/urls.js';
 import { asyncHandler, escapeRegex, fmtDay, HttpError, pageParams, paged } from '../utils/http.js';
 
 // Mounted at /api/repairs behind requireAuth + writePerm('inventory')
@@ -20,6 +22,22 @@ const TABS = {
 };
 const money = (n) => (n == null ? '—' : `₹${Number(n).toLocaleString('en-IN')}`);
 const lean = (r) => (r.toJSON ? r.toJSON() : r);
+
+// Every record also gets:
+//   image          = the inventory item's picture (added in Add Inventory Item), as a full link;
+//                    items without a picture get the default picture (server/public/default-item.png)
+//   imageIsDefault = true when image is that default picture
+// (the damage photo stays in "photo")
+async function withImages(records) {
+  const rows = records.map(lean);
+  const ids = [...new Set(rows.map((r) => String(r.item)).filter(Boolean))];
+  const items = ids.length ? await Item.find({ _id: { $in: ids } }).select('image').lean() : [];
+  const pic = new Map(items.map((i) => [String(i._id), i.image || '']));
+  return rows.map((r) => {
+    const own = pic.get(String(r.item)) || '';
+    return { ...r, image: own || DEFAULT_ITEM_IMAGE, imageIsDefault: !own };
+  });
+}
 
 function listFilter({ status, search, department, item, from }) {
   const f = {};
@@ -96,9 +114,9 @@ router.get(
     const p = pageParams(req.query);
     // photo is a short link now, so it is always included (withPhoto is no longer needed)
     const q = Repair.find(filter).sort({ reportedAt: -1, createdAt: -1 });
-    if (!p) return res.json((await q).map(lean));
+    if (!p) return res.json(await withImages(await q));
     const [rows, total] = await Promise.all([q.skip(p.skip).limit(p.limit), Repair.countDocuments(filter)]);
-    res.json(paged(rows.map(lean), total, p));
+    res.json(paged(await withImages(rows), total, p));
   })
 );
 
@@ -107,7 +125,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const r = await Repair.findById(req.params.id);
     if (!r) throw new HttpError(404, 'Repair record not found');
-    res.json(r);
+    res.json((await withImages([r]))[0]);
   })
 );
 

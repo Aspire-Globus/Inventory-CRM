@@ -54,6 +54,8 @@ app.use(morgan('dev'));
 // Uploaded pictures (item images): /uploads/items/<file>
 app.use('/uploads', express.static(UPLOAD_ROOT, { maxAge: '30d', immutable: true }));
 app.use('/uploads', (req, res) => res.status(404).json({ message: 'Picture not found' })); // never send the web page instead of a picture
+// Default pictures (e.g. /static/default-item.png for items without their own picture)
+app.use('/static', express.static(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public'), { maxAge: '7d' }));
 // After any change to users, own profile/password or the Recycle Bin, drop cached logins
 app.use((req, res, next) => {
   if (req.method !== 'GET' && /^\/api\/(users|auth|trash)/.test(req.path)) res.on('finish', forgetUsers);

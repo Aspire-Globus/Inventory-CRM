@@ -491,6 +491,8 @@ export function buildSpec(serverUrl = '/') {
             assignment: { type: 'string', description: 'Empty for office stock' }, employeeCode: { type: 'string', example: '122474' }, employeeName: { type: 'string', example: 'dikhsha' }, departmentName: { type: 'string', example: 'Human Resources' },
             damageType: { type: 'string', example: 'Screen broken' }, description: { type: 'string' }, responsible: { type: 'string', enum: ['Normal wear', 'Employee'] },
             photo: { type: 'string', example: 'http://192.168.20.214:5000/uploads/repairs/1731.jpg', description: 'Full link to the damage photo ("" = none). Included in lists too.' },
+            image: { type: 'string', example: 'http://192.168.20.214:5000/uploads/items/1700.jpg', description: 'The inventory item\'s picture (added in Add Inventory Item) as a full link. Items without a picture get the default picture http://<server>/static/default-item.png. In lists and details.' },
+            imageIsDefault: { type: 'boolean', example: false, description: 'true = the item has no picture of its own and image is the default picture' },
             reportedAt: { type: 'string', format: 'date-time' },
             status: { type: 'string', enum: ['Damaged', 'In repair', 'Repaired', 'Scrapped', 'Lost'] },
             overdueDays: { type: 'integer', example: 0, description: 'In repair past expectedAt' },
