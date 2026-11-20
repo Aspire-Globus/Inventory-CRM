@@ -131,7 +131,7 @@ export function Pagination({ pg, label = 'rows' }) {
   const to = Math.min(pg.page * pg.size, pg.total);
   const btn = 'min-w-8 h-8 px-2 rounded-md border border-line bg-white text-[13px] font-medium cursor-pointer hover:bg-paper disabled:opacity-40 disabled:cursor-not-allowed';
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-t border-line text-[13px] text-muted">
+    <div className="flex flex-wrap  items-center justify-between gap-3 px-5 py-3 border-t border-line text-[13px] text-muted">
       <div className="flex items-center gap-2">
         <span>Showing <strong className="text-ink">{from}–{to}</strong> of <strong className="text-ink">{pg.total}</strong> {label}</span>
         <select
@@ -144,7 +144,7 @@ export function Pagination({ pg, label = 'rows' }) {
         </select>
       </div>
       {pg.pages > 1 && (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 ml-auto">
           <button className={btn} onClick={() => pg.setPage(pg.page - 1)} disabled={pg.page === 1} aria-label="Previous page">‹</button>
           {pageList(pg.page, pg.pages).map((n) =>
             typeof n === 'string' ? (

@@ -89,8 +89,8 @@ export default function Departments() {
               <div className="flex items-center gap-3">
                 <div className="grid place-items-center w-[42px] h-[42px] rounded-lg bg-brand-soft text-brand"><Icon name="building" /></div>
                 <div className="flex-1 min-w-0">
-                  <h3>{d.name}</h3>
-                  {d.code && <span className="text-muted font-mono text-[12.5px] tracking-tight">{d.code}</span>}
+                  <h3 className="truncate">{d.name}</h3>
+                  {d.code && <p className="text-muted m-0 font-mono text-[12.5px] tracking-tight break-all">{d.code}</p>}
                 </div>
                 {canManage && (
                   <ActionMenu

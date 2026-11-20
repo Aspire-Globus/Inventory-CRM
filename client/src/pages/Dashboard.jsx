@@ -20,7 +20,7 @@ export function CategoryCards({ data }) {
             <span className={`absolute inset-y-0 left-0 w-1.5 ${low ? 'bg-warn' : 'bg-brand'}`} />
             <div className="flex items-center gap-2 text-ink">
               <Icon name={cats?.icon(c.category) || c.category} size={18} className="text-brand" />
-              <span className="text-[14px] font-semibold">{c.category === 'System' ? 'Systems' : c.category}</span>
+              <span className="flex-1 text-[14px] font-semibold truncate">{c.category === 'System' ? 'Systems' : c.category}</span>
               {low && <span className="ml-auto px-2 py-0.5 rounded-md bg-warn-soft text-warn text-[11px] font-semibold">Low stock</span>}
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2 text-center">
