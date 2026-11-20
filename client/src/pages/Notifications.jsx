@@ -42,7 +42,7 @@ export function NotificationItem({ n, open, onToggle }) {
       <button className="flex items-start gap-3 w-full px-1.5 py-3 text-left rounded-lg border-0 bg-transparent cursor-pointer hover:bg-[#F8F9F7]" onClick={onToggle}>
         <span className={`grid place-items-center w-[30px] h-[30px] rounded-full shrink-0 ${a.cls}`}><Icon name={a.icon} size={15} /></span>
         <span className="flex-1 min-w-0 flex flex-col gap-1 [&_small]:text-xs [&_small]:text-muted [&_.badge]:text-[11px] [&_.badge]:px-1.5 [&_.badge]:mr-1">
-          <span className="notif-msg">{n.message}</span>
+          <span className="notif-msg break-all">{n.message}</span>
           <small>
             <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap ${a.cls}`}>{a.label}</span> {n.entity} · {n.actor?.name} ({n.actor?.role}) · {timeAgo(n.createdAt)}
           </small>

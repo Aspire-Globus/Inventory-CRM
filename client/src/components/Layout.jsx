@@ -39,6 +39,8 @@ const NAV = [
 
 // Bell with unread count + latest changes (admins only). Polls every 30 s.
 function NotificationBell() {
+  const navigate = useNavigate();
+
   const [count, setCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [latest, setLatest] = useState([]);
@@ -67,7 +69,19 @@ function NotificationBell() {
 
   return (
     <div className="relative" ref={ref}>
-      <button className={`${tw.iconBtn} relative !w-10 !h-10`} onClick={() => setOpen((o) => !o)} aria-label={`Notifications (${count} unread)`}>
+      {/* <button className={`${tw.iconBtn} relative !w-10 !h-10`} onClick={() => setOpen((o) => !o)} aria-label={`Notifications (${count} unread)`}> */}
+      <button
+        className={`${tw.iconBtn} relative !w-10 !h-10`}
+        onClick={() => {
+          if (window.matchMedia('(max-width: 767px)').matches) {
+            setOpen(false);
+            navigate('/notifications');
+          } else {
+            setOpen((o) => !o);
+          }
+        }}
+        aria-label={`Notifications (${count} unread)`}
+      >
         <Icon name="bell" size={20} />
         {count > 0 && (
           <span className="absolute top-0.5 right-0.5 grid place-items-center min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-white text-[11px] font-bold">
@@ -81,21 +95,23 @@ function NotificationBell() {
             <strong>Notifications</strong>
             {count > 0 && <button className="text-[13px] font-semibold text-brand hover:underline" onClick={readAll}>Mark all read</button>}
           </div>
-          {latest.length ? (
-            latest.map((n) => (
-              <Link
-                key={n._id}
-                to="/notifications"
-                onClick={() => setOpen(false)}
-                className={`flex flex-col gap-0.5 px-4 py-2.5 border-b border-line text-[13px] leading-snug !text-ink hover:no-underline hover:bg-paper ${n.read ? '' : 'bg-brand-soft'}`}
-              >
-                <span>{n.message}</span>
-                <small className="text-[11.5px] text-muted">{timeAgo(n.createdAt)}</small>
-              </Link>
-            ))
-          ) : (
-            <div className="p-5 text-center text-muted">No changes yet.</div>
-          )}
+          <div className="max-h-[calc(100dvh-180px)] min-h-0 overflow-y-auto overscroll-contain">
+            {latest.length ? (
+              latest.map((n) => (
+                <Link
+                  key={n._id}
+                  to="/notifications"
+                  onClick={() => setOpen(false)}
+                  className={`flex flex-col gap-0.5 px-4 py-2.5 border-b border-line text-[13px] leading-snug !text-ink hover:no-underline hover:bg-paper ${n.read ? '' : 'bg-brand-soft'}`}
+                >
+                  <span className="break-all">{n.message}</span>
+                  <small className="text-[11.5px] text-muted">{timeAgo(n.createdAt)}</small>
+                </Link>
+              ))
+            ) : (
+              <div className="p-5 text-center text-muted">No changes yet.</div>
+            )}
+          </div>
           <Link to="/notifications" className="block p-2.5 text-center text-[13px] font-semibold" onClick={() => setOpen(false)}>View all notifications</Link>
         </div>
       )}
@@ -196,7 +212,7 @@ export default function Layout() {
           {can('notifications') && <NotificationBell />}
           <UserMenu />
         </header>
-        <main className="w-full max-w-[1400px] px-7 pt-7 pb-12 space-y-5 max-md:px-4 max-md:pt-5">
+        <main className="w-full px-7 pt-7 pb-12 space-y-5 max-md:px-4 max-md:pt-5">
           <CategoriesProvider>
             <Outlet />
           </CategoriesProvider>
