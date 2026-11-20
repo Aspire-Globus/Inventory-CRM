@@ -64,7 +64,7 @@ export function buildSpec(serverUrl = '/') {
       { name: 'Search', description: 'One search across employees, inventory, assignments, repairs, departments, categories and (with the users permission) login accounts.' },
       { name: 'Reports' },
       { name: 'Users', description: 'Login accounts and permissions' },
-      { name: 'Notifications', description: 'Change log for administrators' },
+      { name: 'Notifications', description: 'Change log for administrators. You only see changes made by **other** users — your own changes are never in your list or unread count.' },
       { name: 'Recycle Bin' },
       { name: 'System' },
     ],
@@ -101,13 +101,13 @@ export function buildSpec(serverUrl = '/') {
       // ---------------- Inventory ----------------
       '/api/items': {
         get: {
-          tags: ['Inventory'], summary: 'List items',
+          tags: ['Inventory'], summary: 'List items (newest first)',
           parameters: [q('search', 'Matches name, brand, model or sub-category'), q('category', 'A category name from GET /api/categories/list, or All'), q('status', 'Active (use this in the app for assignable stock), Inactive, or leave out / All for both', { type: 'string', enum: ['Active', 'Inactive', 'All'] })],
           responses: ok(arr(ref('Item'))),
         },
         post: {
           tags: ['Inventory'], summary: 'Add an item (JSON, or form-data with an image file)',
-          description: `Send **multipart/form-data** to upload a picture: field \`image\` = the file (JPG, PNG, WEBP or GIF, max 5 MB), \`specs\` = a JSON string, all other fields as text. The saved \`image\` is a path like \`/uploads/items/1731.jpg\` — show it as \`<server>/uploads/items/1731.jpg\`. Plain JSON still works.${writes('inventory')}`,
+          description: `Send **multipart/form-data** to upload a picture: field \`image\` = the file (JPG, PNG, WEBP or GIF, max 5 MB), \`specs\` = a JSON string, all other fields as text. Answers give \`image\` as a **full link** (\`http://<server>/uploads/items/1731.jpg\`) — show it as-is. Plain JSON still works: \`image\` may then be a data URL (\`data:image/jpeg;base64,…\`), which is saved as a file.${writes('inventory')}`,
           requestBody: { required: true, content: { 'multipart/form-data': { schema: ITEM_FORM }, 'application/json': { schema: ref('ItemInput') } } },
           responses: created(ref('Item')),
         },
@@ -294,8 +294,33 @@ export function buildSpec(serverUrl = '/') {
       '/api/assignments/{id}/return': {
         post: {
           tags: ['Assignments'], summary: 'Record a return (full or partial)', description: writes('assignments'), parameters: [idParam()],
-          requestBody: body({ type: 'object', required: ['quantity'], properties: { quantity: { type: 'integer', minimum: 1 }, returnDate: { type: 'string', format: 'date' }, condition: { type: 'string', enum: ['Good', 'Damaged', 'Lost'], description: 'Damaged → goes to Repairs (not back in stock). Lost → written off.' }, notes: { type: 'string' }, damageType: { type: 'string', enum: ['Screen broken', 'Body damage', "Won't turn on", 'Keys / ports', 'Water damage', 'Software'] }, description: { type: 'string', example: 'Crack on bottom-left corner' }, responsible: { type: 'string', enum: ['Normal wear', 'Employee'] }, photo: { type: 'string', description: 'Optional image as a data URL (max ~2 MB)' } } }),
+          requestBody: body({ type: 'object', required: ['quantity'], properties: { quantity: { type: 'integer', minimum: 1 }, returnDate: { type: 'string', format: 'date' }, condition: { type: 'string', enum: ['Good', 'Damaged', 'Lost'], description: 'Damaged → goes to Repairs (not back in stock). Lost → written off.' }, notes: { type: 'string' }, damageType: { type: 'string', enum: ['Screen broken', 'Body damage', "Won't turn on", 'Keys / ports', 'Water damage', 'Software'] }, description: { type: 'string', example: 'Crack on bottom-left corner' }, responsible: { type: 'string', enum: ['Normal wear', 'Employee'] }, photo: { type: 'string', description: 'Damage photo (required for Damaged). Either send multipart/form-data with the file in field `photo`, or JSON with a data URL (data:image/jpeg;base64,…). Max 5 MB, JPG/PNG/WEBP/GIF. Answers give it back as a full link.' } } }),
           responses: ok(ref('Assignment')),
+        },
+      },
+
+      '/api/items/import': {
+        post: {
+          tags: ['Inventory'], summary: 'Import items from Excel / CSV rows',
+          description: `The app reads the file and sends its rows. Send \`dryRun: true\` first to check (nothing saved), then the same rows without it to save. Category, sub-category, brand and spec values must match your categories (case does not matter). Each row comes back as created / updated / skipped / error with the reason.${writes('inventory')}`,
+          requestBody: body({ type: 'object', required: ['rows'], properties: {
+            rows: arr({ type: 'object', properties: { row: { type: 'integer', example: 2, description: 'Row number in the sheet (for messages)' }, name: { type: 'string', example: 'HP ProBook 450' }, category: { type: 'string', example: 'System' }, subCategory: { type: 'string', example: 'Laptop' }, brand: { type: 'string', example: 'HP' }, model: { type: 'string' }, totalQuantity: { type: 'integer', example: 5 }, unit: { type: 'string', example: 'pcs' }, unitPrice: { type: 'number', example: 55000 }, vendor: { type: 'string' }, purchaseDate: { type: 'string', example: '18-11-2026' }, warrantyUntil: { type: 'string', example: '17-11-2029' }, description: { type: 'string' }, specs: { type: 'object', additionalProperties: { type: 'string' }, example: { RAM: '16 GB' }, description: 'Field label (or key) → value' } } }),
+            duplicates: { type: 'string', enum: ['skip', 'addStock'], description: 'Same name already in inventory: skip it, or add the quantity to it' },
+            dryRun: { type: 'boolean', example: true },
+          } }),
+          responses: ok({ type: 'object', properties: { dryRun: { type: 'boolean' }, total: { type: 'integer' }, created: { type: 'integer' }, updated: { type: 'integer' }, skipped: { type: 'integer' }, failed: { type: 'integer' }, results: arr({ type: 'object', properties: { row: { type: 'integer' }, name: { type: 'string' }, status: { type: 'string', enum: ['created', 'updated', 'skipped', 'error'] }, message: { type: 'string' } } }) } }),
+        },
+      },
+      '/api/categories/import': {
+        post: {
+          tags: ['Categories'], summary: 'Import categories from Excel / CSV rows',
+          description: `Fields text: \`Label: option | option\` = dropdown, \`Label\` = text box, \`Label [Sub1, Sub2]: …\` = only for those sub-categories; separate fields with \`;\`. Send \`dryRun: true\` first to check.${writes('inventory')}`,
+          requestBody: body({ type: 'object', required: ['rows'], properties: {
+            rows: arr({ type: 'object', properties: { row: { type: 'integer', example: 2 }, name: { type: 'string', example: 'Camera' }, icon: { type: 'string', example: 'Other' }, subCategories: { type: 'string', example: 'CCTV, Webcam' }, brands: { type: 'string', example: 'Hikvision, Logitech' }, fields: { type: 'string', example: 'Resolution: 1080p | 4K; Night vision [CCTV]: Yes | No' } } }),
+            duplicates: { type: 'string', enum: ['skip', 'merge'], description: 'Existing name: skip, or add the new sub-categories, brands and fields to it' },
+            dryRun: { type: 'boolean', example: true },
+          } }),
+          responses: ok({ type: 'object', properties: { created: { type: 'integer' }, updated: { type: 'integer' }, skipped: { type: 'integer' }, failed: { type: 'integer' }, results: arr({ type: 'object' }) } }),
         },
       },
 
@@ -323,7 +348,6 @@ export function buildSpec(serverUrl = '/') {
           parameters: [
             q('status', 'Damaged, In repair, Repaired, Scrapped (incl. Lost), Done (Repaired + Scrapped + Lost). Empty = all', { type: 'string', enum: ['Damaged', 'In repair', 'Repaired', 'Scrapped', 'Lost', 'Done'] }),
             q('from', 'Only records closed on/after this date, e.g. first day of the month', { type: 'string', format: 'date' }),
-            q('withPhoto', 'Send 1 to include the photo (data URL) in each row', { type: 'string', enum: ['1'] }),
             q('department', 'Department id'), q('item', 'Item id'), q('search', 'Item, employee, vendor or damage type'),
             q('page', 'Page number (opt-in pagination)', { type: 'integer' }), q('limit', 'Rows per page (max 100)', { type: 'integer' }),
           ],
@@ -347,12 +371,12 @@ export function buildSpec(serverUrl = '/') {
         post: {
           tags: ['Repairs'], summary: 'Report damage or loss',
           description: `Send **assignmentId** when an employee has the item (it is taken back from them now), or **itemId** for office stock.${writes('inventory')}`,
-          requestBody: body({ type: 'object', required: ['quantity'], properties: { assignmentId: { type: 'string' }, itemId: { type: 'string' }, quantity: { type: 'integer', minimum: 1 }, lost: { type: 'boolean', description: 'true = lost (written off) instead of damaged' }, date: { type: 'string', format: 'date' }, damageType: { type: 'string', enum: ['Screen broken', 'Body damage', "Won't turn on", 'Keys / ports', 'Water damage', 'Software'] }, description: { type: 'string', example: 'Crack on bottom-left corner' }, responsible: { type: 'string', enum: ['Normal wear', 'Employee'] }, photo: { type: 'string', description: 'Optional image as a data URL (max ~2 MB)' } } }),
+          requestBody: body({ type: 'object', required: ['quantity'], properties: { assignmentId: { type: 'string' }, itemId: { type: 'string' }, quantity: { type: 'integer', minimum: 1 }, lost: { type: 'boolean', description: 'true = lost (written off) instead of damaged' }, date: { type: 'string', format: 'date' }, damageType: { type: 'string', enum: ['Screen broken', 'Body damage', "Won't turn on", 'Keys / ports', 'Water damage', 'Software'] }, description: { type: 'string', example: 'Crack on bottom-left corner' }, responsible: { type: 'string', enum: ['Normal wear', 'Employee'] }, photo: { type: 'string', description: 'Damage photo (required for Damaged). Either send multipart/form-data with the file in field `photo`, or JSON with a data URL (data:image/jpeg;base64,…). Max 5 MB, JPG/PNG/WEBP/GIF. Answers give it back as a full link.' } } }),
           responses: created(ref('Repair')),
         },
       },
       '/api/repairs/{id}': {
-        get: { tags: ['Repairs'], summary: 'One record (with photo)', parameters: [idParam()], responses: ok(ref('Repair')) },
+        get: { tags: ['Repairs'], summary: 'One record', parameters: [idParam()], responses: ok(ref('Repair')) },
       },
       '/api/repairs/{id}/send': {
         post: {
@@ -466,6 +490,7 @@ export function buildSpec(serverUrl = '/') {
             quantity: { type: 'integer', example: 1 },
             assignment: { type: 'string', description: 'Empty for office stock' }, employeeCode: { type: 'string', example: '122474' }, employeeName: { type: 'string', example: 'dikhsha' }, departmentName: { type: 'string', example: 'Human Resources' },
             damageType: { type: 'string', example: 'Screen broken' }, description: { type: 'string' }, responsible: { type: 'string', enum: ['Normal wear', 'Employee'] },
+            photo: { type: 'string', example: 'http://192.168.20.214:5000/uploads/repairs/1731.jpg', description: 'Full link to the damage photo ("" = none). Included in lists too.' },
             reportedAt: { type: 'string', format: 'date-time' },
             status: { type: 'string', enum: ['Damaged', 'In repair', 'Repaired', 'Scrapped', 'Lost'] },
             overdueDays: { type: 'integer', example: 0, description: 'In repair past expectedAt' },
@@ -513,7 +538,7 @@ export function buildSpec(serverUrl = '/') {
             totalQuantity: { type: 'integer', example: 125 }, assignedQuantity: { type: 'integer', example: 82 }, availableQuantity: { type: 'integer', example: 43 },
             unit: { type: 'string', example: 'pcs' }, unitPrice: { type: 'number' }, vendor: { type: 'string' },
             purchaseDate: { type: 'string', format: 'date-time' }, warrantyUntil: { type: 'string', format: 'date-time' },
-            description: { type: 'string' }, image: { type: 'string', description: 'Image as a data URL' },
+            description: { type: 'string' }, image: { type: 'string', example: 'http://192.168.20.214:5000/uploads/items/1731.jpg', description: 'Full link to the picture ("" = no picture)' },
             status: { type: 'string', enum: ['Active', 'Inactive'], example: 'Active', description: 'Inactive = retired, cannot be assigned' },
             specDetails: arr({
               type: 'object', description: 'The specs with their labels, in the order set in Manage Categories (only the fields for this sub-category)',

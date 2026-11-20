@@ -8,6 +8,7 @@ import { isDamaged, details, recordFromReturn } from '../services/repairs.js';
 import { asyncHandler, HttpError, escapeRegex, pageParams, paged, pageArray } from '../utils/http.js';
 import { assignItem, returnItem, undoLastReturn } from '../services/stock.js';
 import { notify } from '../services/audit.js';
+import { repairPhoto } from '../middleware/upload.js';
 import { fmtDay } from '../utils/http.js';
 
 const router = Router();
@@ -53,14 +54,13 @@ router.get(
   asyncHandler(async (req, res) => {
     const { department, ...rest } = req.query; // the summary always covers every department
     const match = listFilter({ status: 'Active', ...rest });
-    const rows = await Assignment.aggregate([
+    const [rows, allEmployees] = await Promise.all([Assignment.aggregate([
       { $match: match },
       { $project: { department: 1, departmentName: 1, employee: 1, out: { $subtract: ['$quantity', '$returnedQuantity'] } } },
       { $group: { _id: { id: '$department', name: '$departmentName' }, quantity: { $sum: '$out' }, employees: { $addToSet: '$employee' }, assignments: { $sum: 1 } } },
       { $project: { _id: 0, departmentId: '$_id.id', department: '$_id.name', quantity: 1, employees: { $size: '$employees' }, assignments: 1 } },
       { $sort: { quantity: -1, department: 1 } },
-    ]);
-    const allEmployees = await Assignment.distinct('employee', match);
+    ]), Assignment.distinct('employee', match)]);
     res.json({
       total: {
         quantity: rows.reduce((n, r) => n + r.quantity, 0),
@@ -117,6 +117,7 @@ router.post(
 
 router.post(
   '/:id/return',
+  repairPhoto, // damage photo as a file (multipart, field "photo") or a data URL
   asyncHandler(async (req, res) => {
     const { quantity, returnDate, condition, notes } = req.body;
     if (condition && !['Good', 'Damaged', 'Faulty', 'Lost'].includes(condition)) throw new HttpError(400, 'Condition must be Good, Damaged or Lost');

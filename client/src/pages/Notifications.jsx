@@ -145,7 +145,7 @@ export default function Notifications() {
         ) : error ? (
           <div className="text-danger p-6">{error.message}</div>
         ) : !data.length ? (
-          <Empty>{unreadOnly ? 'You’re all caught up.' : 'No changes recorded yet.'}</Empty>
+          <Empty>{unreadOnly ? 'You’re all caught up.' : 'No changes by other users yet. (Your own changes are not shown here.)'}</Empty>
         ) : (
           <>
           <ul className="list-none m-0 px-5 pb-4">

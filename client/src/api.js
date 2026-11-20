@@ -107,6 +107,10 @@ export const api = {
   repairOptions: () => request('/repairs/options'),
   repairVendors: () => request('/repairs/vendors'),
 
+  // Import from Excel / CSV ({ rows, duplicates, dryRun })
+  importItems: (body) => request('/items/import', { method: 'POST', body }),
+  importCategories: (body) => request('/categories/import', { method: 'POST', body }),
+
   // Global search (top bar)
   search: (q, limit = 5) => request('/search', { params: { q, limit } }),
   reportDamage: (body) => request('/repairs/report', { method: 'POST', body }),

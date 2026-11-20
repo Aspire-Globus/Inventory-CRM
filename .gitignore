@@ -3,3 +3,7 @@ dist
 .env
 
 server/uploads
+
+
+*.zip
+server/certs

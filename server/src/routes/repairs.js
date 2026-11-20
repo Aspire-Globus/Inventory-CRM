@@ -5,6 +5,7 @@ import Assignment from '../models/Assignment.js';
 import { returnItem } from '../services/stock.js';
 import { closeRepair, details, recordFromReturn, recordFromStock, sendToRepair } from '../services/repairs.js';
 import { notify } from '../services/audit.js';
+import { repairPhoto } from '../middleware/upload.js';
 import { asyncHandler, escapeRegex, fmtDay, HttpError, pageParams, paged } from '../utils/http.js';
 
 // Mounted at /api/repairs behind requireAuth + writePerm('inventory')
@@ -93,8 +94,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const filter = listFilter(req.query);
     const p = pageParams(req.query);
-    // Photos are big: only sent with withPhoto=1 (the board shows them on open cards)
-    const q = Repair.find(filter).select(req.query.withPhoto === '1' ? '' : '-photo').sort({ reportedAt: -1, createdAt: -1 });
+    // photo is a short link now, so it is always included (withPhoto is no longer needed)
+    const q = Repair.find(filter).sort({ reportedAt: -1, createdAt: -1 });
     if (!p) return res.json((await q).map(lean));
     const [rows, total] = await Promise.all([q.skip(p.skip).limit(p.limit), Repair.countDocuments(filter)]);
     res.json(paged(rows.map(lean), total, p));
@@ -116,8 +117,10 @@ router.get(
 // Body: { assignmentId | itemId, quantity, lost?, damageType?, description?, responsible?, photo?, date? }
 router.post(
   '/report',
+  repairPhoto, // photo as a file (multipart, field "photo") or a data URL -> saved in uploads/repairs
   asyncHandler(async (req, res) => {
-    const { assignmentId, itemId, quantity, lost } = req.body;
+    const { assignmentId, itemId, quantity } = req.body;
+    const lost = req.body.lost === true || req.body.lost === 'true'; // "false" (text) must NOT count as lost
     details(req.body, { needPhoto: !lost }); // photo required for damage
     let repair;
     if (assignmentId) {

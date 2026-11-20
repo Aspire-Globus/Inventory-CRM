@@ -28,8 +28,8 @@ router.get(
       Employee.countDocuments({ status: 'Active' }),
       Department.countDocuments(),
       Assignment.countDocuments({ status: { $nin: CLOSED } }),
-      Activity.find({ type: { $in: ['ASSIGN', 'RETURN'] } }).sort({ date: -1, createdAt: -1 }).limit(8),
-      Item.find(LOW).sort({ name: 1 }).limit(10),
+      Activity.find({ type: { $in: ['ASSIGN', 'RETURN'] } }).sort({ date: -1, createdAt: -1 }).limit(8).lean(),
+      Item.find(LOW).select('-image').sort({ name: 1 }).limit(10), // pictures are not needed in this list
       Item.countDocuments(LOW),
     ]);
     const t = totals[0] || { total: 0, assigned: 0, repair: 0, items: 0 };

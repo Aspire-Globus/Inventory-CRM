@@ -57,14 +57,14 @@ router.get(
     }
     const p = pageParams(req.query);
     const query = Employee.find(filter).populate('department', 'name').sort({ employeeId: 1 });
-    const [employees, total] = await Promise.all([
+    // Employees and their item counts are fetched at the same time (one database wait instead of two)
+    const [employees, total, counts] = await Promise.all([
       p ? query.skip(p.skip).limit(p.limit).lean() : query.lean(),
       p ? Employee.countDocuments(filter) : 0,
-    ]);
-
-    const counts = await Assignment.aggregate([
-      { $match: { employee: { $in: employees.map((e) => e._id) }, status: { $nin: CLOSED } } },
-      { $group: { _id: '$employee', count: { $sum: { $subtract: ['$quantity', '$returnedQuantity'] } } } },
+      Assignment.aggregate([
+        { $match: { status: { $nin: CLOSED } } },
+        { $group: { _id: '$employee', count: { $sum: { $subtract: ['$quantity', '$returnedQuantity'] } } } },
+      ]),
     ]);
     const map = Object.fromEntries(counts.map((c) => [String(c._id), c.count]));
     const rows = employees.map((e) => ({ ...e, assignedCount: map[String(e._id)] || 0 }));

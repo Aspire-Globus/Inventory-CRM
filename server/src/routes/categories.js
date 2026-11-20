@@ -5,6 +5,7 @@ import Assignment from '../models/Assignment.js';
 import { DEFAULT_CATEGORIES } from '../models/categoryDefaults.js';
 import { asyncHandler, HttpError } from '../utils/http.js';
 import { moveToTrash, notify } from '../services/audit.js';
+import { importRows, same, splitList, txt } from '../utils/importRows.js';
 
 // Mounted behind requireAuth + writePerm('inventory'): everyone can read, the "inventory"
 // permission is needed to add / edit, and "delete" as well to delete.
@@ -174,6 +175,102 @@ router.get(
       fields,                                         // one input per field
       specsTemplate: Object.fromEntries(fields.map((f) => [f.key, ''])), // fill this in and send as "specs" in POST /api/items
     });
+  })
+);
+
+/* ---------- Bulk import: Excel / CSV ----------
+   POST /api/categories/import
+   { rows: [{ name, icon, subCategories: "Laptop, Desktop", brands: "Dell, HP",
+              fields: "RAM: 8 GB | 16 GB; Storage: 256 GB | 512 GB; Battery [Laptop]: 4 hr | 8 hr; Serial No", row }],
+     duplicates: 'skip' | 'merge',   // merge = add the new sub-categories, brands and fields to an existing category
+     dryRun: true }
+   Fields: "Label: option | option" = dropdown · "Label" alone = text box · "Label [Sub1, Sub2]: …" = only for those sub-categories */
+export function parseFields(v) {
+  if (Array.isArray(v)) return v;
+  return String(v ?? '')
+    .split(/[;\n]/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const m = part.match(/^([^:[\]]+?)\s*(?:\[([^\]]*)\])?\s*(?::\s*(.*))?$/);
+      if (!m) throw new Error(`Field "${part}" — write it as  Label: option | option`);
+      const options = (m[3] || '').split('|').map((o) => o.trim()).filter(Boolean);
+      return { label: m[1].trim(), type: options.length ? 'select' : 'text', options, appliesTo: splitList(m[2] || '') };
+    });
+}
+
+router.post(
+  '/import',
+  asyncHandler(async (req, res) => {
+    const { rows, dryRun } = importRows(req.body);
+    const merge = req.body.duplicates === 'merge';
+    const existing = await Category.find();
+    const byName = new Map(existing.map((c) => [c.name.toLowerCase(), c]));
+    const results = [];
+    const creates = new Map(); // lower name -> data
+    const updates = new Map(); // lower name -> { cat, data }
+    let order = existing.length;
+
+    rows.forEach((r, i) => {
+      const row = Number(r.row) || i + 2;
+      const name = txt(r.name);
+      try {
+        if (!name) throw new Error('Category name is empty');
+        const icon = txt(r.icon);
+        const iconOk = ICONS.find((x) => same(x, icon));
+        if (icon && !iconOk) throw new Error(`Icon "${icon}" — use one of: ${ICONS.join(', ')}`);
+        const input = { name, icon: iconOk, subCategories: splitList(r.subCategories), brands: splitList(r.brands), fields: parseFields(r.fields) };
+        const key = name.toLowerCase();
+        const old = byName.get(key) || null;
+        if ((old || creates.has(key) || updates.has(key)) && !merge)
+          return results.push({ row, name, status: 'skipped', message: old ? 'Category already exists — skipped' : 'Same name as an earlier row — skipped' });
+
+        // Merge = keep what is there, add what is new (sub-categories, brands, fields by label)
+        const base = updates.get(key)?.data || creates.get(key) || (old && old.toObject());
+        const data = normalize(
+          base
+            ? {
+                name: base.name,
+                icon: input.icon || base.icon,
+                order: base.order,
+                subCategories: [...base.subCategories, ...input.subCategories],
+                brands: [...base.brands, ...input.brands],
+                fields: [...base.fields, ...input.fields.filter((f) => !base.fields.some((x) => same(x.label, f.label)))],
+              }
+            : input
+        );
+        if (old || updates.has(key)) {
+          const cat = old || updates.get(key).cat;
+          const added = data.subCategories.length - cat.subCategories.length + (data.brands.length - cat.brands.length) + (data.fields.length - cat.fields.length);
+          updates.set(key, { cat, data });
+          return results.push({ row, name, status: 'updated', message: added ? `Merged into the existing category (${data.subCategories.length} sub-categories, ${data.brands.length} brands, ${data.fields.length} fields)` : 'Already has all of this — nothing new' });
+        }
+        if (!creates.has(key)) data.order = ++order;
+        creates.set(key, data);
+        results.push({ row, name, status: 'created', message: `New · ${data.subCategories.length} sub-categories · ${data.brands.length} brands · ${data.fields.length} fields` });
+      } catch (err) {
+        results.push({ row, name, status: 'error', message: err.message });
+      }
+    });
+
+    const count = (s) => results.filter((x) => x.status === s).length;
+    const summary = { dryRun, total: rows.length, created: creates.size, updated: updates.size, skipped: count('skipped'), failed: count('error'), results };
+    if (dryRun || (!creates.size && !updates.size)) return res.json(summary);
+
+    const made = creates.size ? await Category.insertMany([...creates.values()]) : [];
+    for (const { cat, data } of updates.values()) {
+      cat.set(data);
+      await cat.save();
+    }
+    await notify(req, {
+      action: 'created', entity: 'Category', entityName: 'Import',
+      message: `${req.user.name} imported categories from a file: ${made.length} new${updates.size ? `, ${updates.size} updated` : ''}${summary.failed ? `, ${summary.failed} row(s) with errors left out` : ''}`,
+      changes: [
+        ...(made.length ? [{ field: 'New categories', from: '—', to: made.map((c) => c.name).join(', ') }] : []),
+        ...(updates.size ? [{ field: 'Updated', from: '—', to: [...updates.values()].map((u) => u.cat.name).join(', ') }] : []),
+      ],
+    });
+    res.status(201).json(summary);
   })
 );
 

@@ -49,3 +49,9 @@ export function CategoriesProvider({ children }) {
 }
 
 export const useCategories = () => useContext(Ctx);
+
+// Newest category first. Categories made at the same moment (e.g. the default set) keep their normal order.
+const madeAt = (c) => Date.parse(c?.createdAt) || 0;
+export const newestFirst = (list) =>
+  [...list].sort((a, b) => (Math.abs(madeAt(b) - madeAt(a)) > 2000 ? madeAt(b) - madeAt(a) : (a.order ?? 0) - (b.order ?? 0)));
+export const isNewCategory = (c) => Date.now() - madeAt(c) < 24 * 60 * 60 * 1000;

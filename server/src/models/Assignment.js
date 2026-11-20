@@ -69,5 +69,9 @@ export const statusFor = (a) =>
 
 assignmentSchema.index({ employee: 1, status: 1 });
 assignmentSchema.index({ item: 1, status: 1 });
+// Speed up the lists: newest first, by department, by employee code
+assignmentSchema.index({ issueDate: -1, createdAt: -1 });
+assignmentSchema.index({ department: 1, status: 1 });
+assignmentSchema.index({ employeeCode: 1 });
 
 export default mongoose.model('Assignment', assignmentSchema);

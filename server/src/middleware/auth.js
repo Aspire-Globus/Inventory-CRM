@@ -7,6 +7,11 @@ const EXPIRES = () => process.env.JWT_EXPIRES || '7d';
 
 export const signToken = (user) => jwt.sign({ id: user._id, role: user.role }, SECRET(), { expiresIn: EXPIRES() });
 
+const USER_CACHE_MS = 20000;
+const userCache = new Map();
+/** Clear cached logins (after a user, password, permission or Recycle Bin change). */
+export const forgetUsers = () => userCache.clear();
+
 // Any logged-in, active user
 export async function requireAuth(req, res, next) {
   try {
@@ -19,7 +24,14 @@ export async function requireAuth(req, res, next) {
     } catch {
       throw new HttpError(401, 'Session expired — please log in again');
     }
-    const user = await User.findById(payload.id);
+    // Signed-in user is kept in memory for a short time, so most requests skip one database trip.
+    // Any change to users / logins clears this (see forgetUsers in index.js).
+    const hit = userCache.get(payload.id);
+    let user = hit && Date.now() - hit.at < USER_CACHE_MS ? hit.user : null;
+    if (!user) {
+      user = await User.findById(payload.id);
+      if (user) userCache.set(payload.id, { user, at: Date.now() });
+    }
     if (!user || user.status !== 'Active') throw new HttpError(401, 'Account not found or disabled');
     req.user = user;
     next();

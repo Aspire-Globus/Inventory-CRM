@@ -234,7 +234,7 @@ export default function Assignments() {
         </Modal>
       )}
       {damaging && (
-        <Modal title="Mark as damaged" onClose={() => setDamaging(null)} width={500}>
+        <Modal title="Mark as damaged or lost" onClose={() => setDamaging(null)} width={500}>
           <ReportDamageForm assignment={damaging} onCancel={() => setDamaging(null)} onDone={() => { setDamaging(null); reload(); }} />
         </Modal>
       )}

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, fmtDate, today } from '../api.js';
 import { Field, StatusBadge, useAsync, useToast } from './ui.jsx';
 import { tw } from './tw.js';
+import SearchSelect from './SearchSelect.jsx';
 
 // Same list as the server (GET /api/repairs/options)
 export const DAMAGE_TYPES = ['Screen broken', 'Body damage', "Won't turn on", 'Keys / ports', 'Water damage', 'Software'];
@@ -149,34 +150,82 @@ export const emptyDamage = { damageType: '', description: '', photo: '' };
 const Sub = ({ children }) => <div className="-mt-1 text-[13.5px] text-muted">{children}</div>;
 const Note = ({ children }) => <div className="px-3 py-2.5 rounded-lg bg-paper text-[13px] text-[#4A5551]">{children}</div>;
 
+/** One of two big choices ("In store" / "With an employee") */
+function WhereOption({ on, disabled, title, text, onClick }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex-1 flex flex-col gap-0.5 px-3.5 py-3 rounded-xl border text-left ${
+        disabled ? 'border-line bg-paper opacity-60 cursor-not-allowed' : on ? 'border-2 border-brand bg-brand-soft cursor-pointer' : 'border-line bg-white hover:bg-paper cursor-pointer'
+      }`}
+    >
+      <b className={`text-[14px] ${on ? 'text-brand' : ''}`}>{title}</b>
+      <span className="text-[12.5px] text-muted">{text}</span>
+    </button>
+  );
+}
+
 /**
  * Mark damaged (or lost).
- * With `assignment`: the employee has it — it is taken back now.
- * Without: pick an item from office stock.
+ * With `assignment` (Damage button on Assignments): that employee has it — it is taken back now.
+ * Without (Repairs page): pick the item, then where it was: in store (not assigned yet) or with an employee.
  */
-export function ReportDamageForm({ assignment, onDone, onCancel }) {
+export function ReportDamageForm({ assignment, itemId: startItem = '', onDone, onCancel }) {
   const toast = useToast();
-  const holding = assignment ? assignment.quantity - assignment.returnedQuantity : 0;
   const { data: items } = useAsync(() => (assignment ? Promise.resolve([]) : api.items({ status: 'Active' })), [assignment]);
-  const [itemId, setItemId] = useState('');
+  const [itemId, setItemId] = useState(startItem);
+  const [where, setWhere] = useState(''); // 'store' = before assigning · 'employee' = after assigning
+  const [holderId, setHolderId] = useState(''); // the assignment of the employee who has it
+  const { data: holders, loading: holdersLoading } = useAsync(
+    () => (!assignment && itemId ? api.assignments({ item: itemId, status: 'Active' }) : Promise.resolve([])),
+    [itemId]
+  );
   const [quantity, setQuantity] = useState(1);
   const [lost, setLost] = useState(false);
   const [dmg, setDmg] = useState(emptyDamage);
   const [saving, setSaving] = useState(false);
-  const stock = (items || []).filter((i) => i.availableQuantity > 0);
-  const picked = stock.find((i) => i._id === itemId);
-  const max = assignment ? holding : picked?.availableQuantity || 1;
+
+  const choices = (items || []).filter((i) => i.availableQuantity > 0 || i.assignedQuantity > 0);
+  const picked = choices.find((i) => i._id === itemId);
+  const inStore = picked?.availableQuantity || 0;
+  const withEmp = picked?.assignedQuantity || 0;
+  const holding = (a) => a.quantity - a.returnedQuantity;
+  const holder = assignment || (where === 'employee' ? (holders || []).find((h) => h._id === holderId) : null);
+  const max = holder ? holding(holder) : inStore || 1;
+
+  const pickItem = (id) => {
+    const it = choices.find((i) => i._id === id);
+    setItemId(id);
+    setHolderId('');
+    setQuantity(1);
+    // Only one possibility? Choose it already.
+    setWhere(!it ? '' : it.availableQuantity > 0 && !it.assignedQuantity ? 'store' : it.assignedQuantity > 0 && !it.availableQuantity ? 'employee' : '');
+  };
+  // Opened from an item (Inventory ⋮ menu): once items load, pre-choose "in store" / "with employee" like a manual pick
+  useEffect(() => {
+    if (startItem && items) pickItem(startItem);
+  }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Only one employee has it? Select them already.
+  if (where === 'employee' && !holderId && holders?.length === 1) setHolderId(holders[0]._id);
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!assignment && !where) return toast('Choose where the item was: in store or with an employee', 'error');
+    if (!assignment && where === 'employee' && !holder) return toast('Choose the employee who has it', 'error');
     if (!lost && !dmg.photo) return toast('Add a photo of the damage', 'error');
     setSaving(true);
     try {
       await api.reportDamage({
-        ...(assignment ? { assignmentId: assignment._id } : { itemId }),
-        quantity: Number(quantity), date: today(), lost, ...dmg,
+        ...(holder ? { assignmentId: holder._id } : { itemId }),
+        quantity: Number(quantity), date: today(), ...dmg,
+        ...(lost && { damageType: '', photo: '' }), // lost: no damage type or photo
+        lost, // last, so nothing can overwrite it
       });
-      toast(lost ? `${quantity} × written off as lost` : `${quantity} × marked damaged`);
+      toast(lost ? `${quantity} × written off as lost` : `${quantity} × marked damaged${holder ? ` — taken back from ${holder.employeeName}` : ''}`);
       onDone();
     } catch (err) {
       toast(err.message, 'error');
@@ -187,31 +236,98 @@ export function ReportDamageForm({ assignment, onDone, onCancel }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-[18px]">
+      {/* Damaged or Lost: always visible, the chosen one is highlighted */}
+      <div className="flex flex-col gap-2">
+        <Label required>What happened?</Label>
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Damaged or lost">
+          <Chip tone="amber" on={!lost} className="!rounded-lg h-11" onClick={() => setLost(false)}>Damaged</Chip>
+          <Chip tone="red" on={lost} className="!rounded-lg h-11" onClick={() => setLost(true)}>Lost</Chip>
+        </div>
+        <small className="text-muted">
+          {lost ? 'Lost: written off now — total stock goes down. No repair.' : 'Damaged: kept out of stock until it is repaired or scrapped.'}
+        </small>
+      </div>
       {assignment ? (
         <Sub>{assignment.itemName} · with {assignment.employeeName} ({assignment.employeeCode})</Sub>
       ) : (
-        <Field label="Item (office stock)" required>
-          <select value={itemId} onChange={(e) => { setItemId(e.target.value); setQuantity(1); }} required>
-            <option value="">Select item…</option>
-            {stock.map((i) => <option key={i._id} value={i._id}>{i.name} · {i.category} ({i.availableQuantity} on shelf)</option>)}
-          </select>
-        </Field>
+        <>
+          <Field label="Item" required>
+            <SearchSelect
+              value={itemId}
+              onChange={pickItem}
+              required
+              placeholder="Type item name, brand or category…"
+              loading={!items}
+              emptyText="No item matches"
+              options={choices.map((i) => ({
+                value: i._id,
+                label: `${i.name} · ${i.category}`,
+                sub: `${i.availableQuantity} in store · ${i.assignedQuantity} with employees${i.brand ? ` · ${i.brand}` : ''}`,
+              }))}
+            />
+          </Field>
+
+          {picked && (
+            <div className="flex flex-col gap-2">
+              <Label required>{lost ? 'Where was it when it was lost?' : 'Where was it when it got damaged?'}</Label>
+              <div className="flex gap-2 max-sm:flex-col">
+                <WhereOption
+                  on={where === 'store'}
+                  disabled={!inStore}
+                  onClick={() => { setWhere('store'); setQuantity(1); }}
+                  title="In store (before assigning)"
+                  text={inStore ? `Not given to anyone yet · ${inStore} in store` : 'None in store right now'}
+                />
+                <WhereOption
+                  on={where === 'employee'}
+                  disabled={!withEmp}
+                  onClick={() => { setWhere('employee'); setQuantity(1); }}
+                  title="With an employee (after assigning)"
+                  text={withEmp ? `${withEmp} with employees · taken back from them` : 'Not assigned to anyone'}
+                />
+              </div>
+            </div>
+          )}
+
+          {where === 'employee' && (
+            <div className="flex flex-col gap-3 p-3.5 rounded-xl border border-line bg-paper">
+              <Field label="Who has it?" required>
+                <SearchSelect
+                  value={holderId}
+                  onChange={(v) => { setHolderId(v); setQuantity(1); }}
+                  required
+                  placeholder="Type Employee ID, name or department…"
+                  loading={holdersLoading}
+                  emptyText="No employee with this item matches"
+                  options={(holders || []).map((h) => ({
+                    value: h._id,
+                    label: `${h.employeeCode} · ${h.employeeName}`,
+                    sub: `${h.departmentName || 'No department'} · has ${holding(h)}`,
+                  }))}
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Employee ID">
+                  <input value={holder?.employeeCode || ''} readOnly placeholder="—" className="!bg-white" />
+                </Field>
+                <Field label="Department">
+                  <input value={holder?.departmentName || ''} readOnly placeholder="—" className="!bg-white" />
+                </Field>
+              </div>
+            </div>
+          )}
+        </>
       )}
-      {max > 1 && (
-        <Field label="How many?" hint={`${assignment ? 'Holding' : 'On shelf'}: ${max}`}>
+      {max > 1 && (assignment || where === 'store' || (where === 'employee' && holder)) && (
+        <Field label="How many?" hint={`${holder ? `${holder.employeeName} has` : 'In store'}: ${max}`}>
           <input type="number" min="1" max={max} step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} required className="!w-32" />
         </Field>
       )}
       <DamageFields value={dmg} onChange={setDmg} lost={lost} />
-      {!lost && <Note>{assignment ? `Taken back from ${assignment.employeeName} now. ` : ''}Not counted in stock until it's fixed.</Note>}
-      <div className="flex items-center justify-between gap-3 pt-3.5 border-t border-line">
-        <button type="button" className="bg-transparent border-0 p-0 text-[13px] text-danger underline cursor-pointer" onClick={() => setLost((v) => !v)}>
-          {lost ? "It's damaged, not lost" : "It's lost, not damaged"}
-        </button>
-        <div className="flex gap-2">
-          <button type="button" className={tw.btn} onClick={onCancel}>Cancel</button>
-          <button className={lost ? tw.btnDanger : tw.btnPrimary} disabled={saving}>{saving ? 'Saving…' : lost ? 'Mark lost' : 'Mark damaged'}</button>
-        </div>
+      {!lost && <Note>{holder ? `Taken back from ${holder.employeeName} now. ` : ''}Not counted in stock until it's fixed.</Note>}
+      <div className="flex items-center justify-end gap-2 pt-3.5 border-t border-line">
+        <button type="button" className={tw.btn} onClick={onCancel}>Cancel</button>
+        <button className={lost ? tw.btnDanger : tw.btnPrimary} disabled={saving}>{saving ? 'Saving…' : lost ? 'Mark as lost' : 'Mark as damaged'}</button>
       </div>
     </form>
   );

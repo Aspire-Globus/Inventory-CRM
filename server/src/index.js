@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
+import compression from 'compression';
 import mongoose from 'mongoose';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -21,17 +22,22 @@ import userRoutes from './routes/users.js';
 import User from './models/User.js';
 import trashRoutes from './routes/trash.js';
 import notificationRoutes from './routes/notifications.js';
-import { requireAuth, requirePerm, writePerm } from './middleware/auth.js';
+import { requireAuth, requirePerm, writePerm, forgetUsers } from './middleware/auth.js';
 import swaggerUi from 'swagger-ui-express';
 import { buildSpec } from './docs/openapi.js';
 import { ICON_SVG, swaggerCss } from './docs/brand.js';
 import { errorHandler } from './utils/http.js';
 import { UPLOAD_ROOT } from './middleware/upload.js';
+import { fullPictureUrls, rememberBaseUrl } from './utils/urls.js';
+import { migrateInlinePictures } from './services/pictures.js';
 
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/inventory_system';
 
 const app = express();
+// Every image / photo in API answers becomes a full link (http://<server>/uploads/...)
+app.set('json replacer', fullPictureUrls);
+app.use(rememberBaseUrl);
 // CORS: allow this PC on any IP (localhost, 192.168.x.x, 10.x.x.x, PC name), so an IP change
 // never breaks the portal or the app. Extra origins can still be listed in CLIENT_ORIGIN.
 const EXTRA_ORIGINS = (process.env.CLIENT_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -41,12 +47,30 @@ app.use(
     origin: (origin, cb) => cb(null, !origin || LOCAL_ORIGIN.test(origin) || EXTRA_ORIGINS.includes(origin)),
   })
 );
+app.use(compression()); // gzip every answer: JSON lists get 5–10× smaller, so they arrive faster
 app.use(express.json({ limit: '5mb' })); // allows small item images as data URLs
 app.use(morgan('dev'));
 
 // Uploaded pictures (item images): /uploads/items/<file>
 app.use('/uploads', express.static(UPLOAD_ROOT, { maxAge: '30d', immutable: true }));
-app.get('/api/health', (req, res) => res.json({ ok: true, db: mongoose.connection.readyState === 1 }));
+app.use('/uploads', (req, res) => res.status(404).json({ message: 'Picture not found' })); // never send the web page instead of a picture
+// After any change to users, own profile/password or the Recycle Bin, drop cached logins
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && /^\/api\/(users|auth|trash)/.test(req.path)) res.on('finish', forgetUsers);
+  next();
+});
+
+// dbPingMs = how long one trip to the database takes (Atlas over the internet is usually 50–300 ms)
+app.get('/api/health', async (req, res) => {
+  const ok = mongoose.connection.readyState === 1;
+  let dbPingMs = null;
+  if (ok) {
+    const t = Date.now();
+    await mongoose.connection.db.admin().ping().catch(() => {});
+    dbPingMs = Date.now() - t;
+  }
+  res.json({ ok: true, db: ok, dbPingMs });
+});
 app.use('/api/auth', authRoutes); // login is public; /me routes check the token themselves
 
 // Everything below needs a logged-in user.
@@ -81,7 +105,9 @@ app.use('/api', (req, res) => res.status(404).json({ message: 'Not found' }));
 // Serve the built React app in production (client/dist)
 const clientDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../client/dist');
 if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
+  // Built files have a hash in their name, so the browser can keep them for a year; index.html is always re-checked
+  app.use('/assets', express.static(path.join(clientDist, 'assets'), { maxAge: '1y', immutable: true }));
+  app.use(express.static(clientDist, { maxAge: 0 }));
   app.get('*', (req, res) => res.sendFile(path.join(clientDist, 'index.html')));
 }
 
@@ -97,12 +123,18 @@ async function ensureAdmin() {
 }
 
 mongoose
-  .connect(MONGODB_URI)
+  .connect(MONGODB_URI, {
+    maxPoolSize: 20, // several requests at once each get their own connection
+    minPoolSize: 3, // keep a few connections open, so a request never waits for a new Atlas handshake
+    family: 4, // IPv4 only: avoids slow IPv6 lookups on Windows
+    serverSelectionTimeoutMS: 15000,
+  })
   .then(async () => {
     console.log('MongoDB connected');
     await ensureAdmin();
     await ensureCategories();
     await syncAssignments();
+    await migrateInlinePictures().catch((err) => console.warn('Picture clean-up skipped:', err.message));
     app.listen(PORT, process.env.HOST || '0.0.0.0', async () => {
       const { networkInterfaces, hostname } = await import('node:os');
       const ips = Object.values(networkInterfaces())

@@ -5,12 +5,16 @@ import { asyncHandler, pageParams, paged, pageArray } from '../utils/http.js';
 // Mounted behind requireAuth + requirePerm(...)
 const router = Router();
 
+// You are never notified about your own changes: only other users' actions are listed / counted.
+// (Changes made by "System" — no actor — are shown to everyone.)
+const notMine = (me) => ({ 'actor.id': { $ne: me } });
+
 router.get(
   '/',
   asyncHandler(async (req, res) => {
     const me = req.user._id;
     const { unread, entity, limit = 100 } = req.query;
-    const filter = {};
+    const filter = notMine(me);
     if (unread === 'true') filter.readBy = { $ne: me };
     if (entity) filter.entity = entity;
     const p = pageParams(req.query);
@@ -27,14 +31,14 @@ router.get(
 router.get(
   '/unread-count',
   asyncHandler(async (req, res) => {
-    res.json({ count: await Notification.countDocuments({ readBy: { $ne: req.user._id } }) });
+    res.json({ count: await Notification.countDocuments({ ...notMine(req.user._id), readBy: { $ne: req.user._id } }) });
   })
 );
 
 router.post(
   '/read-all',
   asyncHandler(async (req, res) => {
-    await Notification.updateMany({ readBy: { $ne: req.user._id } }, { $addToSet: { readBy: req.user._id } });
+    await Notification.updateMany({ ...notMine(req.user._id), readBy: { $ne: req.user._id } }, { $addToSet: { readBy: req.user._id } });
     res.json({ ok: true });
   })
 );

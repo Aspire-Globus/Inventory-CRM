@@ -78,5 +78,6 @@ repairSchema.virtual('overdueDays').get(function () {
 
 repairSchema.index({ status: 1, reportedAt: -1 });
 repairSchema.index({ item: 1, status: 1 });
+repairSchema.index({ status: 1, 'result.date': -1 }); // board column "Done this month"
 
 export default mongoose.model('Repair', repairSchema);

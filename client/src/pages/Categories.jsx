@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
-import { useCategories } from '../categories.jsx';
+import { useCategories, newestFirst, isNewCategory } from '../categories.jsx';
 import Icon from '../components/Icons.jsx';
 import { ActionMenu, Empty, Field, Modal, useToast } from '../components/ui.jsx';
 import { tw } from '../components/tw.js';
+// Loaded only when Import is clicked (keeps the Excel/CSV code out of the first page load)
+const ImportDialog = lazy(() => import('../components/ImportDialog.jsx'));
 
 const ICONS = ['System', 'Monitor', 'Mouse', 'Keyboard', 'Headset', 'Printer', 'Networking', 'Mobile', 'Other'];
 const ICON_LABEL = { System: 'Computer', Other: 'Box' };
@@ -213,8 +215,10 @@ export default function Categories() {
   const toast = useToast();
   const { can } = useAuth();
   const canDelete = can('delete');
-  const { list, loading, reload } = useCategories();
+  const { list: all, loading, reload } = useCategories();
+  const list = newestFirst(all);
   const [modal, setModal] = useState(null); // { cat } | { cat: null } for new
+  const [importing, setImporting] = useState(false);
 
   const remove = async (c) => {
     if (c.itemCount) return toast(`${c.itemCount} item(s) use "${c.name}" — move or delete them first`, 'error');
@@ -235,15 +239,27 @@ export default function Categories() {
           <Link to="/inventory" className="text-[13px]">← Inventory</Link>
           <h1>Inventory Categories</h1>
         </div>
-        <button className={tw.btnPrimary} onClick={() => setModal({ cat: null })}>
-          <Icon name="plus" size={18} /> Add Category
-        </button>
+        <div className="flex gap-2.5 flex-wrap">
+          <button className={tw.btn} onClick={() => setImporting(true)}>
+            <Icon name="upload" size={18} /> Import
+          </button>
+          <button className={tw.btnPrimary} onClick={() => setModal({ cat: null })}>
+            <Icon name="plus" size={18} /> Add Category
+          </button>
+        </div>
       </div>
+      {importing && (
+        <Modal title="Import from Excel / CSV" onClose={() => setImporting(false)} width={760}>
+          <Suspense fallback={<div className="text-muted text-[13px]">Loading…</div>}>
+            <ImportDialog initialKind="categories" onDone={reload} onClose={() => setImporting(false)} />
+          </Suspense>
+        </Modal>
+      )}
 
       <section className={tw.card}>
         <div className={tw.cardHead}>
           <h2>All Categories <span className="ml-1 px-2 py-0.5 rounded-md bg-brand-soft text-brand text-xs">{list.length}</span></h2>
-          <span className="text-muted text-[13px]">Everything in the Add Inventory Item form comes from here.</span>
+          <span className="text-muted text-[13px]">Newest first · Everything in the Add Inventory Item form comes from here.</span>
         </div>
         {loading ? (
           <div className={tw.loading}>Loading…</div>
@@ -269,6 +285,7 @@ export default function Categories() {
                       <span className={tw.itemCell}>
                         <Icon name={c.icon} size={20} className="text-brand" />
                         <strong>{c.name}</strong>
+                        {isNewCategory(c) && <span className="ml-1 px-1.5 py-px rounded bg-brand-soft text-brand text-[11px] font-semibold">New</span>}
                       </span>
                     </td>
                     <td className="text-muted text-[13px] max-w-[260px]">{c.subCategories.join(', ') || '—'}</td>

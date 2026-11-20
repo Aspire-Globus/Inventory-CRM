@@ -35,4 +35,8 @@ export const AVAILABLE_EXPR = {
   $subtract: ['$totalQuantity', { $add: ['$assignedQuantity', { $ifNull: ['$outOfServiceQuantity', 0] }] }],
 };
 
+// Speed up the inventory list and category / low-stock filters
+itemSchema.index({ category: 1, status: 1 });
+itemSchema.index({ createdAt: 1 });
+
 export default mongoose.model('Item', itemSchema);

@@ -10,7 +10,6 @@ export function details(body, { needPhoto = false } = {}) {
   const damageType = clean(body.damageType);
   if (needPhoto && !body.photo) throw new HttpError(400, 'Add a photo of the damage');
   if (damageType && !DAMAGE_TYPES.includes(damageType) && !OLD_DAMAGE_TYPES.includes(damageType)) throw new HttpError(400, `Damage type must be one of: ${DAMAGE_TYPES.join(', ')}`);
-  if (body.photo && String(body.photo).length > 3_000_000) throw new HttpError(400, 'Photo is too large (max ~2 MB)');
   return {
     damageType,
     description: clean(body.description ?? body.notes),

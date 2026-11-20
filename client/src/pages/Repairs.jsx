@@ -73,7 +73,7 @@ export default function Repairs() {
             <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>History</button>
           </div>
           {view === 'list' && <button className={tw.btn} onClick={exportCsv} disabled={!sorted.length}><Icon name="download" size={16} /> Export</button>}
-          {canEdit && <button className={tw.btnPrimary} onClick={() => setDialog({ type: 'report' })}><Icon name="plus" size={18} /> Mark item damaged</button>}
+          {canEdit && <button className={tw.btnPrimary} onClick={() => setDialog({ type: 'report' })}><Icon name="plus" size={18} /> Mark damaged / lost</button>}
         </div>
       </div>
 
@@ -198,7 +198,7 @@ export default function Repairs() {
       </>)}
 
       {dialog?.type === 'report' && (
-        <Modal title="Mark as damaged (office stock)" onClose={close} width={500}>
+        <Modal title="Mark as damaged or lost" onClose={close} width={500}>
           <ReportDamageForm onCancel={close} onDone={done} />
         </Modal>
       )}

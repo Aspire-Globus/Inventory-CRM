@@ -1,24 +1,32 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, lazy, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, downloadCSV, fmtDate } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import Icon from '../components/Icons.jsx';
 import { ActionMenu, Empty, Field, Modal, StatusBadge, useAsync, useToast } from '../components/ui.jsx';
+import { ReportDamageForm } from '../components/RepairForms.jsx';
+// Loaded only when Import is clicked (keeps the Excel/CSV code out of the first page load)
+const ImportDialog = lazy(() => import('../components/ImportDialog.jsx'));
 import { CategoryCards } from './Dashboard.jsx';
-import { useCategories } from '../categories.jsx';
+import { useCategories, newestFirst } from '../categories.jsx';
 import { BulkBar, CheckAll, CheckCell, Pagination, SortTh, usePagination, useSelection, useSort } from '../components/table.jsx';
 import { tw } from '../components/tw.js';
 import { useUrlParam } from '../components/useUrlParam.js';
 
 // Item form -> multipart/form-data. The picture goes as a real file in field "image";
 // specs (an object) is sent as a JSON string.
-function toFormData(body, file) {
+// Picture formats the server accepts (server/src/middleware/upload.js)
+const IMAGE_TYPES = { 'image/jpeg': 'JPG', 'image/png': 'PNG', 'image/webp': 'WEBP', 'image/gif': 'GIF' };
+const IMAGE_MAX_MB = 5;
+
+function toFormData(body, file, removeImage) {
   const fd = new FormData();
   Object.entries(body).forEach(([k, v]) => {
     if (k === 'image' || v === undefined || v === null) return;
     fd.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
   });
   if (file) fd.append('image', file);
+  else if (removeImage) fd.append('removeImage', 'true'); // edit: picture removed
   return fd;
 }
 
@@ -105,7 +113,7 @@ export function ItemForm({ initial, existing = [], onSaved, onCancel }) {
           return onSaved(dup);
         }
       }
-      const payload = toFormData(body, imageFile);
+      const payload = toFormData(body, imageFile, editing && !form.image && !!initial.image);
       const saved = editing ? await api.updateItem(initial._id, payload) : await api.createItem(payload);
       toast(editing ? 'Item updated' : 'Item added to inventory');
       onSaved(saved);
@@ -219,23 +227,35 @@ export function ItemForm({ initial, existing = [], onSaved, onCancel }) {
         <Field label="Description / Notes (Optional)">
           <textarea rows={5} value={form.description} onChange={set('description')} placeholder="Serial range, configuration notes…" />
         </Field>
-        <label className="flex flex-col items-center justify-center gap-2.5 h-[170px] p-3 rounded-xl border border-dashed border-[#C9D2CD] bg-paper text-muted text-center cursor-pointer hover:border-brand [&_img]:max-w-full [&_img]:max-h-[110px] [&_img]:object-contain">
-          {form.image ? <img src={form.image} alt="" /> : <Icon name="image" size={40} />}
-          <span className="text-brand font-medium">{form.image ? 'Change Image' : 'Upload Image'}</span>
-          <input
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={async (e) => {
-              const file = e.target.files[0];
-              if (!file) return;
-              if (!file.type.startsWith('image/')) return toast('Please choose an image file', 'error');
-              if (file.size > 5 * 1024 * 1024) return toast('Image is too large (max 5 MB)', 'error');
-              setImageFile(file);
-              setForm((f) => ({ ...f, image: URL.createObjectURL(file) })); // preview only
-            }}
-          />
-        </label>
+        <div className="flex flex-col gap-1.5">
+          <label className="flex flex-col items-center justify-center gap-2 h-[170px] p-3 rounded-xl border border-dashed border-[#C9D2CD] bg-paper text-muted text-center cursor-pointer hover:border-brand [&_img]:max-w-full [&_img]:max-h-[100px] [&_img]:object-contain">
+            {form.image ? <img src={form.image} alt="" /> : <Icon name="image" size={40} />}
+            <span className="text-brand font-medium">{form.image ? 'Change Image' : 'Upload Image'}</span>
+            <span className="text-[11.5px]">{Object.values(IMAGE_TYPES).join(', ')} · max {IMAGE_MAX_MB} MB</span>
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files[0];
+                e.target.value = ''; // lets you pick the same file again after an error
+                if (!file) return;
+                if (!IMAGE_TYPES[file.type])
+                  return toast(`"${file.name}" is not allowed. Use ${Object.values(IMAGE_TYPES).join(', ')} (iPhone HEIC photos: share or save them as JPG first).`, 'error');
+                if (file.size > IMAGE_MAX_MB * 1024 * 1024)
+                  return toast(`Image is ${(file.size / 1048576).toFixed(1)} MB — the limit is ${IMAGE_MAX_MB} MB`, 'error');
+                setImageFile(file);
+                setForm((f) => ({ ...f, image: URL.createObjectURL(file) })); // preview only; the file itself is sent as form-data
+              }}
+            />
+          </label>
+          {form.image && (
+            <button type="button" className="self-center bg-transparent border-0 p-0 text-[12.5px] text-danger underline cursor-pointer"
+              onClick={() => { setImageFile(null); setForm((f) => ({ ...f, image: '' })); }}>
+              Remove image
+            </button>
+          )}
+        </div>
       </div>
 
       <div className={tw.formActions}>
@@ -445,8 +465,9 @@ export default function Inventory() {
   const [openId, setOpenId] = useState(null); // expanded row
   const [modal, setModal] = useState(null); // {type, item}
   const { data: items, loading, error, reload } = useAsync(api.items);
-  const { names, specSummary, icon } = useCategories();
+  const { names, list: catList, specSummary, icon } = useCategories();
 
+  // Category cards: newest category first (same order as Manage Categories)
   const summary = useMemo(() => {
     const m = {};
     (items || []).filter((i) => i.status !== 'Inactive').forEach((i) => {
@@ -454,9 +475,10 @@ export default function Inventory() {
       m[i.category].total += i.totalQuantity;
       m[i.category].available += i.availableQuantity;
     });
-    const order = [...names, ...Object.keys(m).filter((c) => !names.includes(c))];
+    const newest = newestFirst(catList).map((c) => c.name);
+    const order = [...newest, ...Object.keys(m).filter((c) => !newest.includes(c))];
     return order.map((c) => m[c]).filter(Boolean);
-  }, [items, names]);
+  }, [items, catList]);
 
   const filtered = useMemo(
     () => (items || []).filter(
@@ -498,6 +520,9 @@ export default function Inventory() {
           <Link className={tw.btn} to="/inventory/categories">
             <Icon name="edit" size={18} /> Manage Categories
           </Link>
+          <button className={tw.btn} onClick={() => setModal({ type: 'import' })}>
+            <Icon name="upload" size={18} /> Import
+          </button>
           <button className={tw.btn} onClick={() => setModal({ type: 'stock' })} disabled={!items?.length}>
             <Icon name="box" size={18} /> Add Stock
           </button>
@@ -560,9 +585,10 @@ export default function Inventory() {
                 {pg.pageRows.map((i, idx) => (
                   <Fragment key={i._id}>
                   <tr
-                    className={`clickable ${sel.selected.has(i._id) ? 'selected' : ''} ${i.status === 'Inactive' ? 'opacity-60' : ''} ${openId === i._id ? '!bg-[#E6F2EF] [&_td]:!border-b-0 [&_td:first-child]:shadow-[inset_3px_0_0_#0F766E]' : ''}`}
-                    onClick={() => setOpenId((id) => (id === i._id ? null : i._id))}
-                    title="Click to see who has it"
+                    className={`${i.assignedQuantity > 0 ? 'clickable' : ''} ${sel.selected.has(i._id) ? 'selected' : ''} ${i.status === 'Inactive' ? 'opacity-60' : ''} ${openId === i._id ? '!bg-[#E6F2EF] [&_td]:!border-b-0 [&_td:first-child]:shadow-[inset_3px_0_0_#0F766E]' : ''}`}
+                    // Only items someone has can open (nothing to show otherwise)
+                    onClick={() => i.assignedQuantity > 0 && setOpenId((id) => (id === i._id ? null : i._id))}
+                    title={i.assignedQuantity > 0 ? 'Click to see who has it' : undefined}
                   >
                     <CheckCell sel={sel} id={i._id} />
                     <td className="text-muted">{(pg.page - 1) * pg.size + idx + 1}</td>
@@ -598,6 +624,7 @@ export default function Inventory() {
                           i.status !== 'Inactive' && i.availableQuantity > 0 && { label: 'Assign to employee', icon: 'arrow', onClick: () => navigate(`/assignments/new?item=${i._id}`) },
                           canManage && { label: 'Add stock', icon: 'plus', onClick: () => setModal({ type: 'stock', item: i }) },
                           { label: 'Who has it', icon: 'users', onClick: () => setModal({ type: 'holders', item: i }) },
+                          canManage && i.status !== 'Inactive' && (i.availableQuantity > 0 || i.assignedQuantity > 0) && { label: 'Mark damaged / lost', icon: 'alert', onClick: () => setModal({ type: 'damage', item: i }) },
                           canManage && { label: 'Edit', icon: 'edit', onClick: () => setModal({ type: 'form', item: i }) },
                           canManage && (i.status === 'Inactive'
                             ? { label: 'Mark Active', icon: 'check', onClick: () => setStatusFor([i], 'Active') }
@@ -606,12 +633,14 @@ export default function Inventory() {
                       />
                     </td>
                     <td className="!pl-0">
-                      <span className={`grid place-items-center w-7 h-7 rounded-md transition-transform ${openId === i._id ? 'rotate-90 bg-brand text-white' : 'text-ink bg-[#EEF1EE]'}`}>
-                        <Icon name="chevron" size={16} style={{ strokeWidth: 2.6 }} />
-                      </span>
+                      {i.assignedQuantity > 0 && (
+                        <span className={`grid place-items-center w-7 h-7 rounded-md transition-transform ${openId === i._id ? 'rotate-90 bg-brand text-white' : 'text-ink bg-[#EEF1EE]'}`}>
+                          <Icon name="chevron" size={16} style={{ strokeWidth: 2.6 }} />
+                        </span>
+                      )}
                     </td>
                   </tr>
-                  {openId === i._id && (
+                  {openId === i._id && i.assignedQuantity > 0 && (
                     <tr className="hover:!bg-transparent"><td colSpan={12} className="!p-0"><UsagePanel item={i} /></td></tr>
                   )}
                   </Fragment>
@@ -627,6 +656,18 @@ export default function Inventory() {
       {modal?.type === 'form' && (
         <Modal title={modal.item ? 'Edit Inventory Item' : 'Add Inventory Item'} onClose={close} width={820}>
           <ItemForm initial={modal.item} existing={items || []} onSaved={done} onCancel={close} />
+        </Modal>
+      )}
+      {modal?.type === 'import' && (
+        <Modal title="Import from Excel / CSV" onClose={close} width={760}>
+          <Suspense fallback={<div className="text-muted text-[13px]">Loading…</div>}>
+            <ImportDialog initialKind="items" onDone={reload} onClose={close} />
+          </Suspense>
+        </Modal>
+      )}
+      {modal?.type === 'damage' && (
+        <Modal title="Mark as damaged or lost" onClose={close} width={500}>
+          <ReportDamageForm itemId={modal.item._id} onCancel={close} onDone={done} />
         </Modal>
       )}
       {modal?.type === 'stock' && (

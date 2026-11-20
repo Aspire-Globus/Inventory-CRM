@@ -23,5 +23,7 @@ const notificationSchema = new mongoose.Schema(
 
 // Keep 90 days of notifications
 notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
+notificationSchema.index({ entity: 1, createdAt: -1 }); // filter by type on the Notifications page
+notificationSchema.index({ createdAt: -1, 'actor.id': 1 }); // newest first, without your own changes
 
 export default mongoose.model('Notification', notificationSchema);

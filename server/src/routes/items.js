@@ -6,6 +6,7 @@ import Activity from '../models/Activity.js';
 import { asyncHandler, HttpError, escapeRegex, pageParams, paged, pageArray } from '../utils/http.js';
 import { diff, notify } from '../services/audit.js';
 import { itemForm, removeUpload } from '../middleware/upload.js';
+import { importRows, same, toDate, toNumber, txt } from '../utils/importRows.js';
 
 // If saving fails, delete the image file that was just uploaded
 const cleanup = (fn) => async (req, res, next) => {
@@ -78,21 +79,25 @@ router.get(
       filter.$or = [{ name: rx }, { brand: rx }, { model: rx }, { subCategory: rx }];
     }
     const p = pageParams(req.query);
-    const [rows, total] = await Promise.all([
-      p ? Item.find(filter).sort({ createdAt: 1 }).skip(p.skip).limit(p.limit) : Item.find(filter).sort({ createdAt: 1 }),
+    // All four queries run at the same time: one wait for the database instead of three in a row
+    const [rows, total, usage, cats] = await Promise.all([
+      // Newest item first
+      p ? Item.find(filter).sort({ createdAt: -1, _id: -1 }).skip(p.skip).limit(p.limit) : Item.find(filter).sort({ createdAt: -1, _id: -1 }),
       p ? Item.countDocuments(filter) : 0,
+      usageQuery(null),
+      Category.find().lean(),
     ]);
-    const out = await withUsage(rows);
+    const out = await withUsage(rows, { usage, cats });
     res.json(p ? paged(out, total, p) : out);
   })
 );
 
 // Every item answer also carries "specDetails": its specs as { key, label, value } rows, in the order
 // set in Manage Categories, so an app can show "Processor: Intel Core i5" without hard-coding labels.
-export async function withDetails(items) {
+export async function withDetails(items, preCats) {
   const one = !Array.isArray(items);
   const list = (one ? [items] : items).map((i) => (i.toJSON ? i.toJSON() : i));
-  const cats = await Category.find({ name: { $in: [...new Set(list.map((i) => i.category))] } }).lean();
+  const cats = preCats || (await Category.find({ name: { $in: [...new Set(list.map((i) => i.category))] } }).lean());
   const byName = Object.fromEntries(cats.map((c) => [c.name, c]));
   const out = list.map((i) => {
     const specs = i.specs || {};
@@ -109,13 +114,21 @@ export async function withDetails(items) {
 }
 
 // Who has each item right now: number of employees and units per department
-async function withUsage(items) {
-  if (!items.length) return [];
-  const usage = await Assignment.aggregate([
-    { $match: { item: { $in: items.map((i) => i._id) }, status: { $nin: CLOSED } } },
+// Who holds what, per item and department. ids = null -> every item (so it can run at the same time as the item query)
+const usageQuery = (ids) =>
+  Assignment.aggregate([
+    { $match: { ...(ids && { item: { $in: ids } }), status: { $nin: CLOSED } } },
     { $project: { item: 1, employee: 1, departmentName: 1, qty: { $subtract: ['$quantity', '$returnedQuantity'] } } },
     { $group: { _id: { item: '$item', dep: '$departmentName' }, quantity: { $sum: '$qty' }, employees: { $addToSet: '$employee' } } },
     { $sort: { quantity: -1 } },
+  ]);
+
+// pre = { usage, cats } already fetched in parallel by the caller (saves database trips)
+async function withUsage(items, pre = {}) {
+  if (!items.length) return [];
+  const [usage, cats] = await Promise.all([
+    pre.usage || usageQuery(items.map((i) => i._id)),
+    pre.cats || Category.find({ name: { $in: [...new Set(items.map((i) => i.category))] } }).lean(),
   ]);
   const byItem = {};
   for (const u of usage) {
@@ -128,7 +141,8 @@ async function withUsage(items) {
     items.map((i) => {
       const u = byItem[String(i._id)];
       return { ...i.toJSON(), usage: { employees: u ? u.employees.size : 0, departments: u ? u.departments : [] } };
-    })
+    }),
+    cats
   );
 }
 
@@ -137,8 +151,11 @@ router.get(
   asyncHandler(async (req, res) => {
     const item = await Item.findById(req.params.id);
     if (!item) throw new HttpError(404, 'Item not found');
-    const holders = await Assignment.find({ item: item._id, status: { $nin: CLOSED } }).sort({ issueDate: -1 });
-    res.json({ item: await withDetails(item), holders });
+    const [holders, detailed] = await Promise.all([
+      Assignment.find({ item: item._id, status: { $nin: CLOSED } }).sort({ issueDate: -1 }),
+      withDetails(item),
+    ]);
+    res.json({ item: detailed, holders });
   })
 );
 
@@ -213,6 +230,116 @@ router.put(
 );
 
 // Add stock (e.g. new purchase)
+/* ---------- Bulk import: Excel / CSV (the app reads the file and sends the rows) ----------
+   POST /api/items/import
+   { rows: [{ name, category, subCategory, brand, model, totalQuantity, unit, unitPrice, vendor,
+              purchaseDate, warrantyUntil, description, specs: { "<field label or key>": "value" }, row }],
+     duplicates: 'skip' | 'addStock',   // an item with the same name already exists
+     dryRun: true }                     // true = only check, save nothing (preview)
+   Each row gets a result: created / updated (stock added) / skipped / error, with the reason. */
+router.post(
+  '/import',
+  asyncHandler(async (req, res) => {
+    const { rows, dryRun } = importRows(req.body);
+    const addStock = req.body.duplicates === 'addStock';
+    const [cats, existing] = await Promise.all([Category.find().lean(), Item.find().select('name totalQuantity unit').lean()]);
+    const catBy = new Map(cats.map((c) => [c.name.toLowerCase(), c]));
+    const itemBy = new Map(existing.map((i) => [i.name.toLowerCase(), i]));
+
+    const results = [];
+    const creates = new Map(); // lower name -> doc to insert (same name twice in the file = one item, quantities added)
+    const stockAdds = new Map(); // existing item id -> { item, qty }
+
+    rows.forEach((r, i) => {
+      const row = Number(r.row) || i + 2; // row number in the sheet (1 = header)
+      const name = txt(r.name);
+      try {
+        if (!name) throw new Error('Item name is empty');
+        const cat = catBy.get(txt(r.category).toLowerCase());
+        if (!cat) throw new Error(txt(r.category) ? `Category "${txt(r.category)}" does not exist — add it first (Manage Categories or import categories)` : 'Category is empty');
+        let sub = txt(r.subCategory);
+        if (cat.subCategories.length) {
+          const m = cat.subCategories.find((x) => same(x, sub));
+          if (!m) throw new Error(`${sub ? `"${sub}" is not a sub-category of ${cat.name}` : 'Sub-category is empty'} — use one of: ${cat.subCategories.join(', ')}`);
+          sub = m;
+        }
+        const qty = toNumber(r.totalQuantity);
+        if (txt(r.totalQuantity) === '' || !Number.isInteger(qty) || qty < 0) throw new Error('Total quantity must be a whole number (0 or more)');
+        if (txt(r.unitPrice) === '') throw new Error('Unit price is empty');
+        const price = toNumber(r.unitPrice);
+        if (!Number.isFinite(price) || price < 0) throw new Error(`Unit price "${txt(r.unitPrice)}" is not a number`);
+        let brand = txt(r.brand);
+        if (brand && cat.brands.length) {
+          const m = cat.brands.find((b) => same(b, brand));
+          if (!m) throw new Error(`Brand "${brand}" is not set up for ${cat.name} — use one of: ${cat.brands.join(', ')}`);
+          brand = m;
+        }
+        // Spec columns: matched to this category's fields by label or key; columns of other categories are ignored
+        const specs = {};
+        const fields = cat.fields.filter((f) => !f.appliesTo?.length || f.appliesTo.includes(sub));
+        for (const [col, raw] of Object.entries(r.specs || {})) {
+          const value = txt(raw);
+          if (!value) continue;
+          const f = fields.find((x) => same(x.label, col) || same(x.key, col));
+          if (!f) continue;
+          if (f.type === 'select') {
+            const opt = f.options.find((o) => same(o, value));
+            if (!opt) throw new Error(`${f.label} "${value}" is not an option — use one of: ${f.options.join(', ')}`);
+            specs[f.key] = opt;
+          } else if (f.type === 'number' && !Number.isFinite(toNumber(value))) throw new Error(`${f.label} must be a number`);
+          else specs[f.key] = value;
+        }
+        const doc = {
+          name, category: cat.name, subCategory: sub, brand, model: txt(r.model), specs,
+          totalQuantity: qty, assignedQuantity: 0, unit: txt(r.unit) || 'pcs', unitPrice: price,
+          vendor: txt(r.vendor), purchaseDate: toDate(r.purchaseDate, 'Purchase date'),
+          warrantyUntil: toDate(r.warrantyUntil, 'Warranty until'), description: txt(r.description),
+        };
+
+        const key = name.toLowerCase();
+        const old = itemBy.get(key);
+        if (old) {
+          if (!addStock) return results.push({ row, name, status: 'skipped', message: 'Already in inventory — skipped' });
+          const cur = stockAdds.get(String(old._id)) || { item: old, qty: 0 };
+          cur.qty += qty;
+          stockAdds.set(String(old._id), cur);
+          return results.push({ row, name, status: 'updated', message: `${qty} ${old.unit} added to the existing item (Total ${old.totalQuantity} → ${old.totalQuantity + cur.qty})` });
+        }
+        if (creates.has(key)) {
+          creates.get(key).totalQuantity += qty;
+          return results.push({ row, name, status: 'created', message: `Same name as an earlier row — ${qty} added to it` });
+        }
+        creates.set(key, doc);
+        results.push({ row, name, status: 'created', message: `New item · ${qty} ${doc.unit} · ₹${price.toLocaleString('en-IN')}` });
+      } catch (err) {
+        results.push({ row, name, status: 'error', message: err.message });
+      }
+    });
+
+    const count = (s) => results.filter((x) => x.status === s).length;
+    const summary = { dryRun, total: rows.length, created: creates.size, updated: stockAdds.size, skipped: count('skipped'), failed: count('error'), results };
+    if (dryRun || (!creates.size && !stockAdds.size)) return res.json(summary);
+
+    // Save: all new items in one go, then the stock additions
+    const made = creates.size ? await Item.insertMany([...creates.values()]) : [];
+    if (stockAdds.size)
+      await Item.bulkWrite([...stockAdds.values()].map(({ item, qty }) => ({ updateOne: { filter: { _id: item._id }, update: { $inc: { totalQuantity: qty } } } })));
+    await Activity.insertMany([
+      ...made.map((it) => ({ type: 'STOCK_ADD', item: it._id, itemName: it.name, quantity: it.totalQuantity, notes: 'Imported from file' })),
+      ...[...stockAdds.values()].map(({ item, qty }) => ({ type: 'STOCK_ADD', item: item._id, itemName: item.name, quantity: qty, notes: 'Stock added by import' })),
+    ]);
+    await notify(req, {
+      action: 'created', entity: 'Item', entityName: 'Import',
+      message: `${req.user.name} imported inventory from a file: ${made.length} new item(s)${stockAdds.size ? `, stock added to ${stockAdds.size}` : ''}${summary.skipped ? `, ${summary.skipped} skipped` : ''}${summary.failed ? `, ${summary.failed} row(s) with errors left out` : ''}`,
+      changes: [
+        { field: 'New items', from: '—', to: made.map((x) => x.name).slice(0, 20).join(', ') + (made.length > 20 ? ` … (+${made.length - 20})` : '') || '—' },
+        ...(stockAdds.size ? [{ field: 'Stock added to', from: '—', to: [...stockAdds.values()].map((x) => `${x.item.name} (+${x.qty})`).slice(0, 20).join(', ') }] : []),
+      ],
+    });
+    res.status(201).json(summary);
+  })
+);
+
 router.post(
   '/:id/stock',
   asyncHandler(async (req, res) => {

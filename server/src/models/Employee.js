@@ -15,5 +15,6 @@ const employeeSchema = new mongoose.Schema(
 );
 
 employeeSchema.index({ name: 'text', employeeId: 'text' });
+employeeSchema.index({ department: 1, status: 1 }); // department page / filters
 
 export default mongoose.model('Employee', employeeSchema);
