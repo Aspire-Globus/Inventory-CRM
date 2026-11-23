@@ -8,6 +8,7 @@ import { Empty, Modal, StatusBadge, useAsync } from '../components/ui.jsx';
 import { RepairDetails, RepairResultForm, ReportDamageForm, SendRepairForm, money } from '../components/RepairForms.jsx';
 import { tw } from '../components/tw.js';
 import RepairBoard from '../components/RepairBoard.jsx';
+import { TableSkeleton } from '../components/Skeleton.jsx';
 import { useUrlParam } from '../components/useUrlParam.js';
 
 const TABS = [['', 'All'], ['Damaged', 'Damaged'], ['In repair', 'In repair'], ['Repaired', 'Repaired'], ['Scrapped', 'Scrapped / Lost']];
@@ -112,7 +113,7 @@ export default function Repairs() {
           </div>
         </div>
         {loading ? (
-          <div className={tw.loading}>Loading…</div>
+          <TableSkeleton rows={8} cols={7} />
         ) : error ? (
           <div className="text-danger p-6">{error.message}</div>
         ) : !rows.length ? (

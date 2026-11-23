@@ -11,6 +11,7 @@ import { CategoryCards } from './Dashboard.jsx';
 import { useCategories, newestFirst } from '../categories.jsx';
 import { BulkBar, CheckAll, CheckCell, Pagination, SortTh, usePagination, useSelection, useSort } from '../components/table.jsx';
 import { tw } from '../components/tw.js';
+import { ListSkeleton, TableSkeleton } from '../components/Skeleton.jsx';
 import { useUrlParam } from '../components/useUrlParam.js';
 
 // Item form -> multipart/form-data. The picture goes as a real file in field "image";
@@ -334,7 +335,7 @@ function AddStock({ item: fixedItem, items = [], onDone, onCancel }) {
 
 function Holders({ item }) {
   const { data, loading } = useAsync(() => api.item(item._id), [item._id]);
-  if (loading) return <div className={tw.loading}>Loading…</div>;
+  if (loading) return <ListSkeleton rows={2} />;
   if (!data.holders.length) return <Empty>No one currently holds this item.</Empty>;
   return (
     <table className={tw.table}>
@@ -378,7 +379,7 @@ function UsagePanel({ item }) {
     return { people, deps: Object.values(d).sort((a, b) => b.quantity - a.quantity) };
   }, [data]);
 
-  if (loading) return <div className="px-6 py-5 text-muted text-[13px]">Loading…</div>;
+  if (loading) return <div className="px-6 py-3"><ListSkeleton rows={2} /></div>;
   if (!people.length)
     return <div className="px-6 py-5 bg-[#F8F9F7] border-t border-line text-muted text-[13px]">Nobody has this item right now — all {item.totalQuantity} {item.unit} are on the shelf.</div>;
 
@@ -555,7 +556,7 @@ export default function Inventory() {
         </div>
 
         {loading ? (
-          <div className={tw.loading}>Loading…</div>
+          <TableSkeleton rows={8} cols={7} />
         ) : error ? (
           <div className="text-danger p-6">{error.message}</div>
         ) : !filtered.length ? (

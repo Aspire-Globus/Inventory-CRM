@@ -10,6 +10,7 @@ import { ReportDamageForm } from '../components/RepairForms.jsx';
 import { BulkBar, CheckAll, CheckCell, Pagination, SortTh, usePagination, useSelection, useSort } from '../components/table.jsx';
 import { Empty, Field, Modal, StatusBadge, assignmentStatus, useAsync, useToast } from '../components/ui.jsx';
 import { tw } from '../components/tw.js';
+import { TableSkeleton } from '../components/Skeleton.jsx';
 import { useUrlParam } from '../components/useUrlParam.js';
 
 const canReturn = (a) => a.outstandingQuantity > 0;
@@ -125,7 +126,7 @@ export default function Assignments() {
           </div>
         </div>
         {loading ? (
-          <div className={tw.loading}>Loading…</div>
+          <TableSkeleton rows={8} cols={7} />
         ) : error ? (
           <div className="text-danger p-6">{error.message}</div>
         ) : !data.length ? (

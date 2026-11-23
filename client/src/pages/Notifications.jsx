@@ -3,6 +3,7 @@ import { api } from '../api.js';
 import Icon from '../components/Icons.jsx';
 import { Empty, useAsync, useToast } from '../components/ui.jsx';
 import { Pagination, usePagination } from '../components/table.jsx';
+import { TableSkeleton } from '../components/Skeleton.jsx';
 import { tw } from '../components/tw.js';
 
 const ACTION = {
@@ -141,7 +142,7 @@ export default function Notifications() {
           </div>
         </div>
         {loading ? (
-          <div className={tw.loading}>Loading…</div>
+          <TableSkeleton rows={8} cols={4} />
         ) : error ? (
           <div className="text-danger p-6">{error.message}</div>
         ) : !data.length ? (

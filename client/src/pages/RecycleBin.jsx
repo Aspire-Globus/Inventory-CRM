@@ -4,6 +4,7 @@ import { useAuth } from '../auth.jsx';
 import Icon from '../components/Icons.jsx';
 import { Empty, useAsync, useToast } from '../components/ui.jsx';
 import { Pagination, usePagination } from '../components/table.jsx';
+import { TableSkeleton } from '../components/Skeleton.jsx';
 import { tw } from '../components/tw.js';
 
 const KINDS = ['Item', 'Employee', 'Department', 'User', 'Category'];
@@ -68,7 +69,7 @@ export default function RecycleBin() {
           </div>
         </div>
         {loading ? (
-          <div className={tw.loading}>Loading…</div>
+          <TableSkeleton rows={6} cols={5} />
         ) : error ? (
           <div className="text-danger p-6">{error.message}</div>
         ) : !items.length ? (

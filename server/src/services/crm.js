@@ -22,14 +22,20 @@ async function crmGet(path) {
   let res;
   try {
     res = await fetch(`${base}/api/external${path}`, {
-      headers: { 'x-service-key': key, 'x-service-name': 'inventory-app', Accept: 'application/json' },
+      headers: { 'x-service-key': key, 'x-service-name': 'inventory-app', Accept: 'application/json', 'User-Agent': 'AspireInventory/1.0 (+inventory.aspireglobus.com)' },
       signal: AbortSignal.timeout(20000),
     });
   } catch (err) {
     throw new Error(`Cannot reach the CRM at ${base} (${err.name === 'TimeoutError' ? 'timed out' : err.message})`);
   }
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(body.message || `CRM request failed (${res.status})`), { status: res.status });
+  if (!res.ok) {
+    const why = body.message || res.statusText || 'request failed';
+    const hint = res.status === 401 || res.status === 403
+      ? ' — check that SERVICE_API_KEY on this server is exactly the key set in the CRM, and that the CRM allows requests from this server (IP allow-list / firewall)'
+      : '';
+    throw Object.assign(new Error(`CRM said ${res.status} ${why}${hint}`), { status: res.status });
+  }
   return body;
 }
 const listOf = (body) => (Array.isArray(body) ? body : body.data ?? body.employees ?? body.items ?? []);

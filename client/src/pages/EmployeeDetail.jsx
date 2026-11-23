@@ -7,6 +7,7 @@ import ReturnForm from '../components/ReturnForm.jsx';
 import { Empty, Modal, StatusBadge, assignmentStatus, useAsync } from '../components/ui.jsx';
 import { EmployeeForm, initials } from './Employees.jsx';
 import { useCrm } from '../components/Crm.jsx';
+import { PageSkeleton } from '../components/Skeleton.jsx';
 import { tw } from '../components/tw.js';
 
 export default function EmployeeDetail() {
@@ -21,7 +22,7 @@ export default function EmployeeDetail() {
   const [editing, setEditing] = useState(false);
   const { data, loading, error, reload } = useAsync(() => api.employee(id), [id]);
 
-  if (loading) return <div className={tw.loading}>Loading…</div>;
+  if (loading) return <PageSkeleton />;
   if (error)
     return (
       <div className={tw.cardPad}>

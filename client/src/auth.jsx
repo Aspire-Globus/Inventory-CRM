@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { api, getToken, setToken } from './api.js';
+import { PageSkeleton } from './components/Skeleton.jsx';
 import { tw } from './components/tw.js';
 
 const AuthCtx = createContext(null);
@@ -73,7 +74,7 @@ export function AuthProvider({ children }) {
 export function RequireAuth({ children, adminOnly, perm }) {
   const { user, ready, isAdmin, can } = useAuth();
   const location = useLocation();
-  if (!ready) return <div className={tw.loading}>Loading…</div>;
+  if (!ready) return <div className="p-8 max-w-[1400px] mx-auto"><PageSkeleton /></div>;
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
   if ((adminOnly && !isAdmin) || (perm && !can(perm))) return <Navigate to="/" replace />;
   return children;

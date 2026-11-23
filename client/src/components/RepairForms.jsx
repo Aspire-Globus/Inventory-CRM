@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, fmtDate, today } from '../api.js';
 import { Field, StatusBadge, useAsync, useToast } from './ui.jsx';
 import { tw } from './tw.js';
+import { ListSkeleton } from './Skeleton.jsx';
 import SearchSelect from './SearchSelect.jsx';
 
 // Same list as the server (GET /api/repairs/options)
@@ -472,7 +473,7 @@ export function RepairResultForm({ repair, initialOutcome = 'Repaired', onDone, 
 /** Read-only view of one record, with a simple timeline */
 export function RepairDetails({ id }) {
   const { data: r, loading, error } = useAsync(() => api.repair(id), [id]);
-  if (loading) return <div className={tw.loading}>Loading…</div>;
+  if (loading) return <ListSkeleton rows={3} />;
   if (error) return <div className="text-danger">{error.message}</div>;
   const steps = [
     { label: r.status === 'Lost' ? 'Reported lost' : 'Reported damaged', date: r.reportedAt, text: [r.damageType, r.description].filter(Boolean).join(' · ') },

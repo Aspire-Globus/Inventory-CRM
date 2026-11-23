@@ -6,6 +6,7 @@ import Icon from '../components/Icons.jsx';
 import { ActionMenu, Empty, Field, Modal, StatusBadge, useAsync, useToast } from '../components/ui.jsx';
 import { Pagination, usePagination } from '../components/table.jsx';
 import { CrmBar, useCrm } from '../components/Crm.jsx';
+import { TableSkeleton } from '../components/Skeleton.jsx';
 import { tw } from '../components/tw.js';
 
 export function EmployeeForm({ initial, onSaved, onCancel }) {
@@ -156,7 +157,7 @@ export default function Employees() {
           </div>
         </div>
         {loading ? (
-          <div className={tw.loading}>Loading…</div>
+          <TableSkeleton rows={8} cols={7} />
         ) : error ? (
           <div className="text-danger p-6">{error.message}</div>
         ) : !data.length ? (

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, fmtDate } from '../api.js';
 import { StatusBadge, assignmentStatus, useAsync } from './ui.jsx';
+import { ListSkeleton } from './Skeleton.jsx';
 import { tw } from './tw.js';
 
 // The server writes "Reassigned to/from X (ID) — note"; keep only the user's note
@@ -66,7 +67,7 @@ export default function TransferDetails({ assignment, onClose }) {
           {emp && <StatusBadge status={emp.status} />}
         </div>
         {loading ? (
-          <div className="p-4 text-muted text-[13px]">Loading…</div>
+          <div className="p-4"><ListSkeleton rows={2} /></div>
         ) : error ? (
           <div className="p-4 text-danger text-[13px]">{error.message}</div>
         ) : !holding.length ? (

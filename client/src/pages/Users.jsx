@@ -5,6 +5,7 @@ import Icon from '../components/Icons.jsx';
 import { ActionMenu, Empty, Field, Modal, StatusBadge, useAsync, useToast } from '../components/ui.jsx';
 import { initials } from './Employees.jsx';
 import { Pagination, usePagination } from '../components/table.jsx';
+import { TableSkeleton } from '../components/Skeleton.jsx';
 import { tw } from '../components/tw.js';
 
 // Permission labels (kept in sync with the server's PERMISSIONS list)
@@ -155,7 +156,7 @@ export default function Users() {
           <h2>Login Accounts {data && <span className="ml-1.5 align-middle bg-brand-soft text-brand text-xs font-semibold px-2 py-0.5 rounded-md">{data.length}</span>}</h2>
         </div>
         {loading ? (
-          <div className={tw.loading}>Loading…</div>
+          <TableSkeleton rows={6} cols={5} />
         ) : error ? (
           <div className="text-danger p-6">{error.message}</div>
         ) : !data.length ? (

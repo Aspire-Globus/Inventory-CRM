@@ -7,9 +7,14 @@ const PICTURE_KEYS = new Set(['image', 'photo']);
 // Default picture for an item without its own (server/public/default-item.png)
 export const DEFAULT_ITEM_IMAGE = '/static/default-item.png';
 
-/** Remember this request's address (http://<host>) while it is handled. */
+/** Remember this request's address while it is handled.
+    PUBLIC_URL (e.g. https://inventory.aspireglobus.com) wins when set — use it on the live server.
+    Otherwise: the browser's own scheme from the proxy header (https behind Hostinger), then the host. */
 export function rememberBaseUrl(req, res, next) {
-  store.run(`${req.protocol}://${req.get('host')}`, next);
+  const fixed = String(process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  const proto = String(req.get('x-forwarded-proto') || req.protocol).split(',')[0].trim();
+  const host = String(req.get('x-forwarded-host') || req.get('host')).split(',')[0].trim();
+  store.run(fixed || `${proto}://${host}`, next);
 }
 
 /** JSON replacer: "/uploads/..." in an image / photo field -> full link for the current request. */

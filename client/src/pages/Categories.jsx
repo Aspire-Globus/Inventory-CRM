@@ -5,6 +5,7 @@ import { useAuth } from '../auth.jsx';
 import { useCategories, newestFirst, isNewCategory } from '../categories.jsx';
 import Icon from '../components/Icons.jsx';
 import { ActionMenu, Empty, Field, Modal, useToast } from '../components/ui.jsx';
+import { TableSkeleton } from '../components/Skeleton.jsx';
 import { tw } from '../components/tw.js';
 // Loaded only when Import is clicked (keeps the Excel/CSV code out of the first page load)
 const ImportDialog = lazy(() => import('../components/ImportDialog.jsx'));
@@ -262,7 +263,7 @@ export default function Categories() {
           <span className="text-muted text-[13px]">Newest first · Everything in the Add Inventory Item form comes from here.</span>
         </div>
         {loading ? (
-          <div className={tw.loading}>Loading…</div>
+          <TableSkeleton rows={6} />
         ) : !list.length ? (
           <Empty>No categories yet — add your first one.</Empty>
         ) : (

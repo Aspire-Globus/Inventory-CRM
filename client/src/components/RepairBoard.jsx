@@ -2,6 +2,7 @@ import { api, fmtDate } from '../api.js';
 import Icon from './Icons.jsx';
 import { useAsync } from './ui.jsx';
 import { money } from './RepairForms.jsx';
+import { ListSkeleton } from './Skeleton.jsx';
 import { tw } from './tw.js';
 
 const monthStart = () => {
@@ -28,7 +29,7 @@ function Column({ kind, count, extra, children, loading }) {
         <h2 className={`m-0 text-[16px] font-bold ${c.head}`}>{c.title} <span className="font-medium opacity-80">({count ?? '–'})</span></h2>
         <span className={`text-[12.5px] opacity-80 ${c.head}`}>{extra || c.hint}</span>
       </div>
-      {loading ? <div className="text-muted text-[13px] py-6 text-center">Loading…</div> : children}
+      {loading ? <ListSkeleton rows={3} /> : children}
     </section>
   );
 }

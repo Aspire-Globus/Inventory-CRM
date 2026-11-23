@@ -3,6 +3,7 @@ import { api, fmtDate } from '../api.js';
 import Icon from '../components/Icons.jsx';
 import { Empty, useAsync } from '../components/ui.jsx';
 import { tw } from '../components/tw.js';
+import { PageSkeleton } from '../components/Skeleton.jsx';
 import { useCategories } from '../categories.jsx';
 
 // Stock per category: Total, In use (with employees) and Available (on the shelf)
@@ -54,7 +55,7 @@ export function CategoryCards({ data }) {
 export default function Dashboard() {
   const { data, loading, error } = useAsync(api.dashboard);
 
-  if (loading) return <div className={tw.loading}>Loading…</div>;
+  if (loading) return <PageSkeleton />;
   if (error) return <div className="card bg-white border border-line rounded-xl shadow-panel p-6 text-danger">Could not reach the server: {error.message}</div>;
 
   const { totals, byCategory, departments, activeAssignments, recent, lowStock } = data;

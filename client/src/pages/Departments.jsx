@@ -6,6 +6,7 @@ import Icon from '../components/Icons.jsx';
 import { ActionMenu, Empty, Field, Modal, useAsync, useToast } from '../components/ui.jsx';
 import { EmployeeForm } from './Employees.jsx';
 import { CrmBar, useCrm } from '../components/Crm.jsx';
+import { CardsSkeleton } from '../components/Skeleton.jsx';
 import { tw } from '../components/tw.js';
 
 function DepartmentForm({ initial, onSaved, onCancel }) {
@@ -80,7 +81,7 @@ export default function Departments() {
       </div>
       <CrmBar onSynced={reload} />
       {loading ? (
-        <div className={tw.loading}>Loading…</div>
+        <CardsSkeleton count={10} />
       ) : error ? (
         <div className="card bg-white border border-line rounded-xl shadow-panel p-6 text-danger">{error.message}</div>
       ) : !data.length ? (

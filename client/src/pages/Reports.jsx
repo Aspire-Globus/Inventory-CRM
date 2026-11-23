@@ -4,12 +4,13 @@ import { api, downloadCSV, fmtDate } from '../api.js';
 import Icon from '../components/Icons.jsx';
 import { BADGE, Empty, useAsync } from '../components/ui.jsx';
 import { Pagination, usePagination } from '../components/table.jsx';
+import { TableSkeleton } from '../components/Skeleton.jsx';
 import { tw } from '../components/tw.js';
 
 function StockReport() {
   const { data, loading } = useAsync(api.stockReport);
   const pg = usePagination(data || []);
-  if (loading) return <div className={tw.loading}>Loading…</div>;
+  if (loading) return <TableSkeleton rows={8} />;
   const rows = data.map((i) => ({
     Item: i.name, Category: i.category, Total: i.totalQuantity, Assigned: i.assignedQuantity, Available: i.availableQuantity, Unit: i.unit,
   }));
@@ -59,7 +60,7 @@ function DepartmentReport() {
     const rows = Object.values(map).map((r) => ({ ...r, Total: cats.reduce((s, c) => s + (r[c] || 0), 0) }));
     return { cats, rows };
   }, [data]);
-  if (loading) return <div className={tw.loading}>Loading…</div>;
+  if (loading) return <TableSkeleton rows={8} />;
   return (
     <>
       <div className={tw.cardHead}>
@@ -111,7 +112,7 @@ function ActivityReport() {
           <button className={tw.btnSm} onClick={() => downloadCSV('movement-history.csv', rows)}><Icon name="download" size={14} /> CSV</button>
         </div>
       </div>
-      {loading ? <div className={tw.loading}>Loading…</div> : !rows.length ? <Empty>No activity in this range.</Empty> : (
+      {loading ? <TableSkeleton rows={8} cols={5} /> : !rows.length ? <Empty>No activity in this range.</Empty> : (
         <>
         <div className={tw.tableWrap}>
           <table className={tw.table}>
