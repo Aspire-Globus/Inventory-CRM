@@ -5,6 +5,7 @@
      CRM_BASE_URL       e.g. https://crm.aspireglobus.com
      SERVICE_API_KEY    the same secret that is set in the CRM
    Without CRM_BASE_URL / SERVICE_API_KEY the app works as before (employees managed here). */
+import mongoose from 'mongoose';
 import Employee from '../models/Employee.js';
 import Department from '../models/Department.js';
 import { escapeRegex, HttpError } from '../utils/http.js';
@@ -115,6 +116,35 @@ async function saveEmployee(m, deptCache) {
   return before ? 'updated' : 'added';
 }
 
+const deptKey = (m) => m.departmentId || m.department.toLowerCase();
+
+/** All departments of the CRM list in one go: read every department once, create / rename in one batched write.
+    Returns Map(department key -> _id). */
+async function saveDepartments(list) {
+  const all = await Department.find().select('name crmId source').lean();
+  const byCrmId = new Map(all.filter((d) => d.crmId).map((d) => [d.crmId, d]));
+  const byName = new Map(all.map((d) => [d.name.toLowerCase(), d]));
+  const ids = new Map();
+  const ops = [];
+  for (const m of list) {
+    const key = deptKey(m);
+    if (ids.has(key)) continue;
+    const found = (m.departmentId && byCrmId.get(m.departmentId)) || byName.get(m.department.toLowerCase());
+    if (found) {
+      ids.set(key, found._id);
+      if (found.source !== 'crm' || found.name !== m.department || (m.departmentId && found.crmId !== m.departmentId))
+        ops.push({ updateOne: { filter: { _id: found._id }, update: { $set: { source: 'crm', name: m.department, ...(m.departmentId ? { crmId: m.departmentId } : {}) } } } });
+    } else {
+      const _id = new mongoose.Types.ObjectId();
+      ids.set(key, _id);
+      byName.set(m.department.toLowerCase(), { _id, name: m.department, crmId: m.departmentId, source: 'crm' });
+      ops.push({ insertOne: { document: { _id, name: m.department, code: '', source: 'crm', ...(m.departmentId ? { crmId: m.departmentId } : {}) } } });
+    }
+  }
+  if (ops.length) await Department.bulkWrite(ops, { ordered: true });
+  return ids;
+}
+
 /** Copy all CRM employees/departments into this app. Employees that are NOT in the CRM become Inactive. */
 export async function syncFromCrm() {
   crmState.enabled = crmEnabled();
@@ -131,12 +161,36 @@ export async function syncFromCrm() {
     if (!list.length) throw new Error('The CRM returned no employees — nothing changed');
 
     const counts = { crmEmployees: list.length, added: 0, updated: 0, deactivatedLocal: 0, departments: 0 };
-    const deptCache = new Map();
-    for (const m of list) counts[await saveEmployee(m, deptCache)] += 1;
-    counts.departments = deptCache.size;
+    const deptCache = await saveDepartments(list); // department key -> _id (1 read + 1 batched write)
+    counts.departments = new Set(deptCache.values()).size;
+
+    // All employees in ONE batched write (instead of 2 database trips per employee)
+    const codes = [...new Set(list.map((m) => m.code))];
+    const existing = new Set((await Employee.find({ employeeId: { $in: codes } }).select('employeeId').lean()).map((e) => e.employeeId));
+    const now = new Date();
+    const seen = new Set();
+    const ops = [];
+    for (const m of list) {
+      if (seen.has(m.code)) continue; // the same code twice in the CRM list: keep the first
+      seen.add(m.code);
+      ops.push({
+        updateOne: {
+          filter: { employeeId: m.code },
+          update: {
+            $set: {
+              name: m.name, department: deptCache.get(deptKey(m)), designation: m.designation, email: m.email,
+              phone: m.phone, location: m.location, status: m.status, source: 'crm', crmSyncedAt: now,
+            },
+            $setOnInsert: { employeeId: m.code },
+          },
+          upsert: true,
+        },
+      });
+      counts[existing.has(m.code) ? 'updated' : 'added'] += 1;
+    }
+    if (ops.length) await Employee.bulkWrite(ops, { ordered: false });
 
     // Employees only in this app (e.g. old dummy/test data): hide them from pickers, keep their history
-    const codes = list.map((m) => m.code);
     const r = await Employee.updateMany({ employeeId: { $nin: codes }, status: 'Active' }, { $set: { status: 'Inactive' } });
     counts.deactivatedLocal = r.modifiedCount || 0;
 

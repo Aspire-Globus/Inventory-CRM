@@ -129,6 +129,21 @@ async function ensureAdmin() {
   console.log(`Created default admin → ${email} / ${password}  (change the password after logging in)`);
 }
 
+// 1) Start listening straight away — hosts like Hostinger require listen() within a few seconds.
+//    Requests that need the database simply wait (Mongoose queues them) until the connection below is ready.
+function printAddresses() {
+  import('node:os').then(({ networkInterfaces, hostname }) => {
+    const ips = Object.values(networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4' && !n.internal).map((n) => n.address);
+    console.log(`Local:   http://localhost:${PORT}`);
+    ips.forEach((ip) => console.log(`Network: http://${ip}:${PORT}`));
+    console.log(`Fixed:   http://${hostname()}:${PORT}   <- same URL even when the IP changes`);
+  });
+}
+// PORT can be a number or (on some hosts) a socket path — a path must be listened on without a host
+if (/^\d+$/.test(String(PORT))) app.listen(Number(PORT), process.env.HOST || '0.0.0.0', printAddresses);
+else app.listen(PORT, () => console.log(`Listening on ${PORT}`));
+
+// 2) Then connect to MongoDB and run the start-up jobs in the background
 mongoose
   .connect(MONGODB_URI, {
     maxPoolSize: 20, // several requests at once each get their own connection
@@ -143,20 +158,10 @@ mongoose
     await syncAssignments();
     startCrmSync(); // employees & departments from the CRM (when CRM_BASE_URL + SERVICE_API_KEY are set)
     await migrateInlinePictures().catch((err) => console.warn('Picture clean-up skipped:', err.message));
-    app.listen(PORT, process.env.HOST || '0.0.0.0', async () => {
-      const { networkInterfaces, hostname } = await import('node:os');
-      const ips = Object.values(networkInterfaces())
-        .flat()
-        .filter((n) => n && n.family === 'IPv4' && !n.internal)
-        .map((n) => n.address);
-      console.log(`Local:   http://localhost:${PORT}`);
-      ips.forEach((ip) => console.log(`Network: http://${ip}:${PORT}`));
-      console.log(`Fixed:   http://${hostname()}:${PORT}   <- same URL even when the IP changes`);
-    });
   })
   .catch((err) => {
-    console.error('MongoDB connection failed:', err.message);
-    process.exit(1);
+    console.error('MongoDB connection failed:', err.message, '— check MONGODB_URI and Atlas Network Access (allow this server\'s IP)');
+    process.exit(1); // the host restarts the app
   });
 
 export default app;
