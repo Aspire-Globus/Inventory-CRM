@@ -93,7 +93,7 @@ export default function Departments() {
                 <div className="grid place-items-center w-[42px] h-[42px] rounded-lg bg-brand-soft text-brand"><Icon name="building" /></div>
                 <div className="flex-1 min-w-0">
                   <h3 className="truncate">{d.name}</h3>
-                  {d.code && <p className="text-muted m-0 font-mono text-[12.5px] tracking-tight break-all">{d.code}</p>}
+                  {/* no code line: CRM departments have no code (it was only made-up initials) */}
                 </div>
                 {canManage && (
                   <ActionMenu

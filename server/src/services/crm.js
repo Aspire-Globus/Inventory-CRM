@@ -4,7 +4,6 @@
    Env (server/.env and the hosting panel — never commit the key):
      CRM_BASE_URL       e.g. https://crm.aspireglobus.com
      SERVICE_API_KEY    the same secret that is set in the CRM
-     CRM_SYNC_MINUTES   how often to sync (default 10)
    Without CRM_BASE_URL / SERVICE_API_KEY the app works as before (employees managed here). */
 import Employee from '../models/Employee.js';
 import Department from '../models/Department.js';
@@ -87,14 +86,12 @@ export function mapCrmEmployee(r = {}) {
 /* ---------- Sync ---------- */
 export const crmState = { enabled: false, running: false, lastRun: null, lastOk: null, lastError: '', counts: null };
 
-const deptCode = (name) => name.split(/[\s&/-]+/).filter(Boolean).map((w) => w[0]).join('').toUpperCase().slice(0, 6) || 'DEP';
-
 // Find the department by its CRM id (then by name), create it if missing; the CRM's name always wins
 async function departmentFor(name, crmId, cache) {
   const key = crmId || name.toLowerCase();
   if (cache.has(key)) return cache.get(key);
   let dep = (crmId && (await Department.findOne({ crmId }))) || (await Department.findOne({ name: new RegExp(`^${escapeRegex(name)}$`, 'i') }));
-  if (!dep) dep = await Department.create({ name, code: deptCode(name), source: 'crm', ...(crmId ? { crmId } : {}) });
+  if (!dep) dep = await Department.create({ name, code: '', source: 'crm', ...(crmId ? { crmId } : {}) }); // the CRM has no department codes
   else if (dep.source !== 'crm' || dep.name !== name || (crmId && dep.crmId !== crmId))
     await Department.updateOne({ _id: dep._id }, { $set: { source: 'crm', name, ...(crmId ? { crmId } : {}) } });
   cache.set(key, dep._id);
@@ -121,7 +118,9 @@ export async function syncFromCrm() {
   crmState.lastRun = new Date();
   try {
     let raw;
-    try { raw = await getCrmEmployees({ status: 'all' }); } catch { raw = await getCrmEmployees(); }
+    // Ask for active + inactive staff; if the CRM doesn't support that (error or empty list), ask for the default list
+    try { raw = await getCrmEmployees({ status: 'all' }); } catch { raw = []; }
+    if (!raw.length) raw = await getCrmEmployees();
     const list = raw.map(mapCrmEmployee).filter((m) => m.code && m.name);
     if (!list.length) throw new Error('The CRM returned no employees — nothing changed');
 
@@ -154,17 +153,16 @@ export async function syncFromCrm() {
   }
 }
 
-/** Start syncing at server start and then every CRM_SYNC_MINUTES. */
+/** At server start: sync once from the CRM. No timer after that — sync again with "Sync now"
+    (POST /api/crm/sync). A new hire is fetched on its own when they are assigned an item. */
 export function startCrmSync() {
   crmState.enabled = crmEnabled();
   if (!crmState.enabled) {
-    console.log('CRM sync off (CRM_BASE_URL / SERVICE_API_KEY not set) — employees are managed in this app');
+    console.log('CRM link off (CRM_BASE_URL / SERVICE_API_KEY not set) — employees are managed in this app');
     return;
   }
-  const minutes = Math.max(1, Number(process.env.CRM_SYNC_MINUTES) || 10);
+  console.log(`CRM link on: ${cfg().base} — synced at start, then with "Sync now" on the Employees / Departments page`);
   syncFromCrm().catch(() => {});
-  setInterval(() => syncFromCrm().catch(() => {}), minutes * 60 * 1000).unref();
-  console.log(`CRM sync on: ${cfg().base} every ${minutes} min`);
 }
 
 /** Employee by code: from this app, or fetched from the CRM right now (a brand-new hire not synced yet). */

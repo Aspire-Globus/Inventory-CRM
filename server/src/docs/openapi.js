@@ -64,7 +64,7 @@ export function buildSpec(serverUrl = '/') {
       { name: 'Search', description: 'One search across employees, inventory, assignments, repairs, departments, categories and (with the users permission) login accounts.' },
       { name: 'Reports' },
       { name: 'Users', description: 'Login accounts and permissions' },
-      { name: 'CRM', description: 'Employees and departments come from the CRM (crm.aspireglobus.com) when CRM_BASE_URL and SERVICE_API_KEY are set on the server. They are synced every CRM_SYNC_MINUTES (default 10) and on start. While the link is on, adding / editing / deleting employees or departments here returns **409** — change them in the CRM. Assigning by Employee ID looks the person up in the CRM if they are not synced yet.' },
+      { name: 'CRM', description: 'Employees and departments come from the CRM (crm.aspireglobus.com) when CRM_BASE_URL and SERVICE_API_KEY are set on the server. They are synced once when the server starts, and again whenever someone runs POST /api/crm/sync (the Sync now button). There is no timer. While the link is on, adding / editing / deleting employees or departments here returns **409** — change them in the CRM. Assigning by Employee ID looks the person up in the CRM if they are not synced yet.' },
       { name: 'Notifications', description: 'Change log for administrators. You only see changes made by **other** users — your own changes are never in your list or unread count.' },
       { name: 'Recycle Bin' },
       { name: 'System' },

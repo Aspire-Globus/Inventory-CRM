@@ -1,0 +1,16 @@
+{
+  "name": "aspire-inventory",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Aspire System Management — one app: the API (server/) also serves the built React app (client/dist)",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "postinstall": "npm install --prefix server --omit=dev && npm install --prefix client --include=dev && npm run build --prefix client",
+    "build": "npm run build --prefix client",
+    "start": "node index.js"
+  }
+}
