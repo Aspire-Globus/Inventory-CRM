@@ -7,7 +7,11 @@ import { HttpError } from '../utils/http.js';
 import { toStoredPath } from '../utils/urls.js';
 
 // Uploaded files live in server/uploads and are served at /uploads/...
-export const UPLOAD_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../uploads');
+// Where pictures are saved. On a live server set UPLOAD_DIR to a folder OUTSIDE the app folder,
+// so pictures survive redeploys (e.g. UPLOAD_DIR=/home/<user>/aspire-uploads).
+export const UPLOAD_ROOT = process.env.UPLOAD_DIR
+  ? path.resolve(process.env.UPLOAD_DIR)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../uploads');
 const ITEM_DIR = path.join(UPLOAD_ROOT, 'items');
 const REPAIR_DIR = path.join(UPLOAD_ROOT, 'repairs');
 fs.mkdirSync(ITEM_DIR, { recursive: true });

@@ -1019,6 +1019,71 @@
       ]
     },
     {
+      "name": "CRM",
+      "item": [
+        {
+          "name": "Is the CRM link on? Last sync time, result and error",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/crm/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crm",
+                "status"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Sync employees & departments from the CRM now (Employees permission)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/crm/sync",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crm",
+                "sync"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        },
+        {
+          "name": "Admin: first 3 raw CRM records and how they are read (check the field mapping)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/crm/preview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crm",
+                "preview"
+              ],
+              "query": []
+            },
+            "description": "**Permission:** any signed-in user."
+          }
+        }
+      ]
+    },
+    {
       "name": "Assignments",
       "item": [
         {

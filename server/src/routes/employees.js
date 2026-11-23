@@ -5,6 +5,7 @@ import Activity from '../models/Activity.js';
 import Department from '../models/Department.js';
 import mongoose from 'mongoose';
 import { asyncHandler, HttpError, escapeRegex, pageParams, paged, pageArray } from '../utils/http.js';
+import { blockWhenCrm, crmEnabled, employeeByCode } from '../services/crm.js';
 import { diff, moveToTrash, notify } from '../services/audit.js';
 
 const EMP_FIELDS = [
@@ -78,8 +79,10 @@ router.get(
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const query = /^[a-f\d]{24}$/i.test(id) ? { _id: id } : { employeeId: id.toUpperCase() };
-    const employee = await Employee.findOne(query).populate('department', 'name');
-    if (!employee) throw new HttpError(404, 'Employee not found');
+    let employee = await Employee.findOne(query).populate('department', 'name');
+    // CRM link on: a new hire not synced yet is fetched from the CRM right now
+    if (!employee && query.employeeId && crmEnabled()) employee = await employeeByCode(query.employeeId).catch(() => null);
+    if (!employee) throw new HttpError(404, crmEnabled() ? `Employee ID ${id.toUpperCase()} was not found in the CRM` : 'Employee not found');
 
     const [assignments, history] = await Promise.all([
       Assignment.find({ employee: employee._id }).sort({ issueDate: -1, createdAt: -1 }),
@@ -92,6 +95,7 @@ router.get(
 router.post(
   '/',
   asyncHandler(async (req, res) => {
+    blockWhenCrm('Employees'); // managed in the CRM when the link is on
     const data = pick(req.body);
     await resolveDepartment(data);
     if (!data.employeeId) data.employeeId = await nextEmployeeId();
@@ -109,6 +113,7 @@ router.post(
 router.put(
   '/:id',
   asyncHandler(async (req, res) => {
+    blockWhenCrm('Employees'); // managed in the CRM when the link is on
     const data = pick(req.body);
     Object.keys(data).forEach((k) => data[k] === undefined && delete data[k]);
     await resolveDepartment(data);
@@ -129,6 +134,7 @@ router.put(
 router.delete(
   '/:id',
   asyncHandler(async (req, res) => {
+    blockWhenCrm('Employees'); // managed in the CRM when the link is on
     const emp = await Employee.findById(req.params.id).populate('department', 'name');
     if (!emp) throw new HttpError(404, 'Employee not found');
     if (await Assignment.exists({ employee: emp._id, status: { $nin: CLOSED } }))

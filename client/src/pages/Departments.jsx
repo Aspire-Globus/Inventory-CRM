@@ -5,6 +5,7 @@ import { useAuth } from '../auth.jsx';
 import Icon from '../components/Icons.jsx';
 import { ActionMenu, Empty, Field, Modal, useAsync, useToast } from '../components/ui.jsx';
 import { EmployeeForm } from './Employees.jsx';
+import { CrmBar, useCrm } from '../components/Crm.jsx';
 import { tw } from '../components/tw.js';
 
 function DepartmentForm({ initial, onSaved, onCancel }) {
@@ -45,7 +46,8 @@ function DepartmentForm({ initial, onSaved, onCancel }) {
 export default function Departments() {
   const toast = useToast();
   const { can } = useAuth();
-  const canManage = can('departments');
+  const crm = useCrm(); // CRM link on -> departments come from the CRM
+  const canManage = can('departments') && !crm.enabled;
   const canDelete = canManage && can('delete');
   const navigate = useNavigate();
   const [modal, setModal] = useState(null);
@@ -76,6 +78,7 @@ export default function Departments() {
           </div>
         )}
       </div>
+      <CrmBar onSynced={reload} />
       {loading ? (
         <div className={tw.loading}>Loading…</div>
       ) : error ? (

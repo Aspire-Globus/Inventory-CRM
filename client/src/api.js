@@ -113,6 +113,9 @@ export const api = {
 
   // Global search (top bar)
   search: (q, limit = 5) => request('/search', { params: { q, limit } }),
+  // Employees & departments from the CRM
+  crmStatus: () => request('/crm/status'),
+  crmSync: () => request('/crm/sync', { method: 'POST' }),
   reportDamage: (body) => request('/repairs/report', { method: 'POST', body }),
   sendToRepair: (id, body) => request(`/repairs/${id}/send`, { method: 'POST', body }),
   repairResult: (id, body) => request(`/repairs/${id}/result`, { method: 'POST', body }),

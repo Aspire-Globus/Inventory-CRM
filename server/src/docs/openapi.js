@@ -64,6 +64,7 @@ export function buildSpec(serverUrl = '/') {
       { name: 'Search', description: 'One search across employees, inventory, assignments, repairs, departments, categories and (with the users permission) login accounts.' },
       { name: 'Reports' },
       { name: 'Users', description: 'Login accounts and permissions' },
+      { name: 'CRM', description: 'Employees and departments come from the CRM (crm.aspireglobus.com) when CRM_BASE_URL and SERVICE_API_KEY are set on the server. They are synced every CRM_SYNC_MINUTES (default 10) and on start. While the link is on, adding / editing / deleting employees or departments here returns **409** — change them in the CRM. Assigning by Employee ID looks the person up in the CRM if they are not synced yet.' },
       { name: 'Notifications', description: 'Change log for administrators. You only see changes made by **other** users — your own changes are never in your list or unread count.' },
       { name: 'Recycle Bin' },
       { name: 'System' },
@@ -325,6 +326,15 @@ export function buildSpec(serverUrl = '/') {
       },
 
       // ---------------- Search ----------------
+      '/api/crm/status': {
+        get: { tags: ['CRM'], summary: 'Is the CRM link on? Last sync time, result and error', responses: ok({ type: 'object', properties: { enabled: { type: 'boolean' }, running: { type: 'boolean' }, lastRun: { type: 'string', format: 'date-time' }, lastOk: { type: 'string', format: 'date-time' }, lastError: { type: 'string' }, counts: { type: 'object', example: { crmEmployees: 120, added: 3, updated: 117, deactivatedLocal: 0, departments: 9 } } } }) },
+      },
+      '/api/crm/sync': {
+        post: { tags: ['CRM'], summary: 'Sync employees & departments from the CRM now (Employees permission)', responses: ok({ type: 'object', properties: { ok: { type: 'boolean' }, counts: { type: 'object' }, lastOk: { type: 'string', format: 'date-time' } } }) },
+      },
+      '/api/crm/preview': {
+        get: { tags: ['CRM'], summary: 'Admin: first 3 raw CRM records and how they are read (check the field mapping)', responses: ok({ type: 'object' }) },
+      },
       '/api/search': {
         get: {
           tags: ['Search'], summary: 'Global search (top search bar)',

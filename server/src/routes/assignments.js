@@ -9,6 +9,7 @@ import { asyncHandler, HttpError, escapeRegex, pageParams, paged, pageArray } fr
 import { assignItem, returnItem, undoLastReturn } from '../services/stock.js';
 import { notify } from '../services/audit.js';
 import { repairPhoto } from '../middleware/upload.js';
+import { crmEnabled, employeeByCode } from '../services/crm.js';
 import { fmtDay } from '../utils/http.js';
 
 const router = Router();
@@ -169,7 +170,8 @@ router.post(
     } else {
       const code = String(employeeCode || '').trim().toUpperCase();
       if (!code) throw new HttpError(400, 'Choose the employee to reassign to');
-      target = await Employee.findOne({ employeeId: code }).populate('department');
+      target = crmEnabled() ? await employeeByCode(code) : await Employee.findOne({ employeeId: code }).populate('department');
+      if (!target && crmEnabled()) throw new HttpError(404, `Employee ID ${code} was not found in the CRM`);
       if (!target) {
         if (!departmentId || !(await Department.exists({ _id: departmentId }))) throw new HttpError(400, 'Department is required for a new Employee ID');
         if (!String(employeeName || '').trim()) throw new HttpError(400, 'Employee name is required for a new Employee ID');

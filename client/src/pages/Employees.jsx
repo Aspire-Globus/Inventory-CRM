@@ -5,6 +5,7 @@ import { useAuth } from '../auth.jsx';
 import Icon from '../components/Icons.jsx';
 import { ActionMenu, Empty, Field, Modal, StatusBadge, useAsync, useToast } from '../components/ui.jsx';
 import { Pagination, usePagination } from '../components/table.jsx';
+import { CrmBar, useCrm } from '../components/Crm.jsx';
 import { tw } from '../components/tw.js';
 
 export function EmployeeForm({ initial, onSaved, onCancel }) {
@@ -92,7 +93,8 @@ export const initials = (name = '') => name.split(/\s+/).filter(Boolean).slice(0
 export default function Employees() {
   const toast = useToast();
   const { can } = useAuth();
-  const canManage = can('employees');
+  const crm = useCrm(); // CRM link on -> people are added / changed in the CRM, not here
+  const canManage = can('employees') && !crm.enabled;
   const canDelete = canManage && can('delete');
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -132,6 +134,8 @@ export default function Employees() {
           )}
         </div>
       </div>
+
+      <CrmBar onSynced={reload} />
 
       <section className={tw.card}>
         <div className={tw.cardHead}>

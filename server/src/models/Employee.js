@@ -10,6 +10,9 @@ const employeeSchema = new mongoose.Schema(
     email: { type: String, trim: true, lowercase: true, default: '' },
     phone: { type: String, trim: true, default: '' },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
+    // 'crm' = copied from the CRM (read-only here); 'local' = added in this app before the CRM link
+    source: { type: String, enum: ['local', 'crm'], default: 'local' },
+    crmSyncedAt: { type: Date },
   },
   { timestamps: true }
 );

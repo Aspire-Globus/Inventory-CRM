@@ -6,12 +6,14 @@ import Icon from '../components/Icons.jsx';
 import ReturnForm from '../components/ReturnForm.jsx';
 import { Empty, Modal, StatusBadge, assignmentStatus, useAsync } from '../components/ui.jsx';
 import { EmployeeForm, initials } from './Employees.jsx';
+import { useCrm } from '../components/Crm.jsx';
 import { tw } from '../components/tw.js';
 
 export default function EmployeeDetail() {
   const { id } = useParams();
   const { can } = useAuth();
-  const canManage = can('employees');
+  const crm = useCrm();
+  const canManage = can('employees') && !crm.enabled; // edited in the CRM when the link is on
   const canDelete = canManage && can('delete');
   const navigate = useNavigate();
   const [tab, setTab] = useState('assigned');

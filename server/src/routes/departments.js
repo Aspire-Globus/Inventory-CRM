@@ -3,6 +3,7 @@ import Department from '../models/Department.js';
 import Employee from '../models/Employee.js';
 import Assignment, { CLOSED } from '../models/Assignment.js';
 import { asyncHandler, HttpError, pageParams, paged, pageArray } from '../utils/http.js';
+import { blockWhenCrm } from '../services/crm.js';
 import { diff, moveToTrash, notify } from '../services/audit.js';
 
 const DEP_FIELDS = [['name', 'Name'], ['code', 'Code'], ['description', 'Description']];
@@ -31,6 +32,7 @@ router.get(
 router.post(
   '/',
   asyncHandler(async (req, res) => {
+    blockWhenCrm('Departments'); // managed in the CRM when the link is on
     const { name, code, description } = req.body;
     const dep = await Department.create({ name, code, description });
     await notify(req, {
@@ -45,6 +47,7 @@ router.post(
 router.put(
   '/:id',
   asyncHandler(async (req, res) => {
+    blockWhenCrm('Departments'); // managed in the CRM when the link is on
     const { name, code, description } = req.body;
     const before = await Department.findById(req.params.id).lean();
     if (!before) throw new HttpError(404, 'Department not found');
@@ -63,6 +66,7 @@ router.put(
 router.delete(
   '/:id',
   asyncHandler(async (req, res) => {
+    blockWhenCrm('Departments'); // managed in the CRM when the link is on
     if (await Employee.exists({ department: req.params.id }))
       throw new HttpError(400, 'Move or remove employees in this department first');
     const dep = await Department.findById(req.params.id);

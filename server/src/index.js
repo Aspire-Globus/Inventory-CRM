@@ -16,6 +16,8 @@ import departmentRoutes from './routes/departments.js';
 import assignmentRoutes from './routes/assignments.js';
 import repairRoutes from './routes/repairs.js';
 import searchRoutes from './routes/search.js';
+import crmRoutes from './routes/crm.js';
+import { startCrmSync } from './services/crm.js';
 import reportRoutes from './routes/reports.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
@@ -35,6 +37,8 @@ const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/inventory_system';
 
 const app = express();
+// Behind Hostinger's / any host's proxy: trust its https info, so picture links are https:// (not blocked as mixed content)
+app.set('trust proxy', 1);
 // Every image / photo in API answers becomes a full link (http://<server>/uploads/...)
 app.set('json replacer', fullPictureUrls);
 app.use(rememberBaseUrl);
@@ -86,6 +90,7 @@ app.use('/api/departments', requireAuth, writePerm('departments'), departmentRou
 app.use('/api/assignments', requireAuth, writePerm('assignments'), assignmentRoutes);
 app.use('/api/repairs', requireAuth, writePerm('inventory'), repairRoutes);
 app.use('/api/search', requireAuth, searchRoutes); // global search (top bar)
+app.use('/api/crm', requireAuth, crmRoutes); // employees & departments from the CRM: status / sync / preview
 app.use('/api/reports', requireAuth, reportRoutes);
 app.use('/api/users', requireAuth, requirePerm('users'), userRoutes);
 app.use('/api/trash', requireAuth, requirePerm('recycleBin'), trashRoutes);
@@ -136,6 +141,7 @@ mongoose
     await ensureAdmin();
     await ensureCategories();
     await syncAssignments();
+    startCrmSync(); // employees & departments from the CRM (when CRM_BASE_URL + SERVICE_API_KEY are set)
     await migrateInlinePictures().catch((err) => console.warn('Picture clean-up skipped:', err.message));
     app.listen(PORT, process.env.HOST || '0.0.0.0', async () => {
       const { networkInterfaces, hostname } = await import('node:os');

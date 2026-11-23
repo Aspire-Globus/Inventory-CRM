@@ -4,6 +4,7 @@ import Employee from '../models/Employee.js';
 import Assignment, { statusFor } from '../models/Assignment.js';
 import Activity from '../models/Activity.js';
 import Department from '../models/Department.js';
+import { crmEnabled, employeeByCode } from './crm.js';
 import { HttpError, toInt } from '../utils/http.js';
 
 /**
@@ -26,6 +27,13 @@ async function resolveEmployee({ employeeId, employeeCode, employeeName, departm
 
   const code = String(employeeCode || '').trim().toUpperCase();
   if (!code) throw new HttpError(400, 'Employee ID is required');
+  // CRM link on: the employee (and their department) comes from the CRM — no new employees are made here
+  if (crmEnabled()) {
+    const emp = await employeeByCode(code);
+    if (!emp) throw new HttpError(404, `Employee ID ${code} was not found in the CRM`);
+    if (emp.status !== 'Active') throw new HttpError(400, `${emp.name} (${code}) is inactive in the CRM`);
+    return { employee: emp, created: false };
+  }
   if (!departmentId) throw new HttpError(400, 'Department is required');
   const department = await Department.findById(departmentId);
   if (!department) throw new HttpError(400, 'Department not found');

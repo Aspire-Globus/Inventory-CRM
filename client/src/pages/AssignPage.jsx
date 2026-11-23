@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, fmtDate, today } from '../api.js';
 import Icon from '../components/Icons.jsx';
 import { Field, useAsync, useToast } from '../components/ui.jsx';
+import { useCrm } from '../components/Crm.jsx';
 import { tw } from '../components/tw.js';
 
 const EMPTY_EMP = { code: '', name: '', designation: '', location: '' };
@@ -13,6 +14,7 @@ export default function AssignPage() {
   const [params] = useSearchParams();
   const { data: items, reload: reloadItems } = useAsync(api.items);
   const { data: departments } = useAsync(api.departments);
+  const crm = useCrm(); // CRM link on -> employees come from the CRM, none are created here
 
   const [departmentId, setDepartmentId] = useState('');
   const [emp, setEmp] = useState(EMPTY_EMP);
@@ -65,6 +67,10 @@ export default function AssignPage() {
       setSuggestions(list.slice(0, 6));
       if (!exact) {
         setFound(null);
+        if (crm.enabled) {
+          setLookup({ state: 'mismatch', message: `${value.toUpperCase()} was not found in the CRM. Add the employee in the CRM first, or pick a name from the list.` });
+          return;
+        }
         setLookup({ state: 'new', message: 'New Employee ID — the employee will be created in this department.' });
         return;
       }
