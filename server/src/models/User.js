@@ -28,6 +28,8 @@ const userSchema = new mongoose.Schema(
     designation: { type: String, trim: true, default: '' },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
     lastLogin: { type: Date },
+    // "Clear all" in the bell: notifications up to this time are hidden from THIS user's bell (others still see them)
+    notificationsClearedAt: { type: Date },
   },
   { timestamps: true }
 );

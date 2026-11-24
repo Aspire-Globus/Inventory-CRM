@@ -470,12 +470,16 @@ export function buildSpec(serverUrl = '/') {
       '/api/notifications': {
         get: {
           tags: ['Notifications'], summary: 'Change notifications, newest first', description: perm('notifications'),
-          parameters: [q('unread', 'true for unread only'), q('entity', 'Item, Assignment, Employee, Department, User or Recycle Bin'), q('limit', 'Max rows (default 100, max 500)', { type: 'integer' })],
+          parameters: [q('hideCleared', 'Send 1 to leave out what you cleared with Clear all (the bell does this)', { type: 'string', enum: ['1'] }),
+            q('unread', 'true for unread only'), q('entity', 'Item, Assignment, Employee, Department, User or Recycle Bin'), q('limit', 'Max rows (default 100, max 500)', { type: 'integer' })],
           responses: ok(arr(ref('Notification'))),
         },
       },
       '/api/notifications/unread-count': { get: { tags: ['Notifications'], summary: 'Unread count (for a badge)', description: perm('notifications'), responses: ok({ type: 'object', properties: { count: { type: 'integer' } } }) } },
       '/api/notifications/{id}/read': { post: { tags: ['Notifications'], summary: 'Mark one as read', description: perm('notifications'), parameters: [idParam()], responses: ok(OkTrue) } },
+      '/api/notifications/clear': {
+        post: { tags: ['Notifications'], summary: 'Clear all from MY bell (hidden for me only, marked read; others and the full history keep them)', responses: ok({ type: 'object', properties: { ok: { type: 'boolean' }, clearedAt: { type: 'string', format: 'date-time' } } }) },
+      },
       '/api/notifications/read-all': { post: { tags: ['Notifications'], summary: 'Mark all as read', description: perm('notifications'), responses: ok(OkTrue) } },
 
       // ---------------- Recycle Bin ----------------

@@ -63,6 +63,7 @@ export const api = {
   unreadCount: () => request('/notifications/unread-count'),
   markRead: (id) => request(`/notifications/${id}/read`, { method: 'POST' }),
   markAllRead: () => request('/notifications/read-all', { method: 'POST' }),
+  clearNotifications: () => request('/notifications/clear', { method: 'POST' }),
 
   // Inventory
   items: (params) => request('/items', { params }),

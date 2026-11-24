@@ -55,7 +55,7 @@ function NotificationBell() {
   }, []);
   useEffect(() => {
     if (!open) return;
-    api.notifications({ limit: 8 }).then(setLatest).catch(() => {});
+    api.notifications({ limit: 8, hideCleared: 1 }).then(setLatest).catch(() => {});
     const close = (e) => !ref.current?.contains(e.target) && setOpen(false);
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
@@ -65,6 +65,12 @@ function NotificationBell() {
     await api.markAllRead();
     setCount(0);
     setLatest((l) => l.map((n) => ({ ...n, read: true })));
+  };
+  // Clear all: empties MY bell (others still see them; full history stays on the Notifications page)
+  const clearAll = async () => {
+    await api.clearNotifications();
+    setCount(0);
+    setLatest([]);
   };
 
   return (
@@ -93,7 +99,10 @@ function NotificationBell() {
         <div className="absolute right-0 top-12 z-20 w-[360px] max-w-[calc(100vw-32px)] overflow-hidden bg-white border border-line rounded-xl shadow-pop animate-pop">
           <div className="flex items-center justify-between px-4 py-3 border-b border-line">
             <strong>Notifications</strong>
-            {count > 0 && <button className="text-[13px] font-semibold text-brand hover:underline" onClick={readAll}>Mark all read</button>}
+            <span className="flex items-center gap-3">
+              {count > 0 && <button className="text-[13px] font-semibold text-brand hover:underline" onClick={readAll}>Mark all read</button>}
+              {latest.length > 0 && <button className="text-[13px] font-semibold text-danger hover:underline" onClick={clearAll} title="Remove these from your bell (the full history stays on the Notifications page)">Clear all</button>}
+            </span>
           </div>
           <div className="max-h-[calc(100dvh-180px)] min-h-0 overflow-y-auto overscroll-contain">
             {latest.length ? (
@@ -104,12 +113,15 @@ function NotificationBell() {
                   onClick={() => setOpen(false)}
                   className={`flex flex-col gap-0.5 px-4 py-2.5 border-b border-line text-[13px] leading-snug !text-ink hover:no-underline hover:bg-paper ${n.read ? '' : 'bg-brand-soft'}`}
                 >
-                  <span className="break-all">{n.message}</span>
+                  <span className="[overflow-wrap:anywhere]">{n.message}</span>
                   <small className="text-[11.5px] text-muted">{timeAgo(n.createdAt)}</small>
                 </Link>
               ))
             ) : (
-              <div className="p-5 text-center text-muted">No changes yet.</div>
+              <div className="flex flex-col items-center gap-1 p-6 text-center text-muted">
+                <Icon name="bell" size={22} />
+                <span>You're all caught up.</span>
+              </div>
             )}
           </div>
           <Link to="/notifications" className="block p-2.5 text-center text-[13px] font-semibold" onClick={() => setOpen(false)}>View all notifications</Link>
