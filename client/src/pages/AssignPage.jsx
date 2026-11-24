@@ -5,6 +5,7 @@ import Icon from '../components/Icons.jsx';
 import { Field, useAsync, useToast } from '../components/ui.jsx';
 import { useCrm } from '../components/Crm.jsx';
 import { tw } from '../components/tw.js';
+import SearchSelect from '../components/SearchSelect.jsx';
 
 const EMPTY_EMP = { code: '', name: '', designation: '', location: '' };
 
@@ -22,6 +23,10 @@ export default function AssignPage() {
   const [lookup, setLookup] = useState({ state: 'idle', message: '' }); // idle | checking | found | new | mismatch
   const [suggestions, setSuggestions] = useState([]);
   const [showSug, setShowSug] = useState(false);
+  // Active employees of the chosen department (for the dropdown)
+  const [deptEmps, setDeptEmps] = useState([]);
+  const [loadingEmps, setLoadingEmps] = useState(false);
+  const [manual, setManual] = useState(false); // type a new Employee ID instead (only when the CRM link is off)
 
   const [itemId, setItemId] = useState(params.get('item') || '');
   const [quantity, setQuantity] = useState(1);
@@ -41,6 +46,31 @@ export default function AssignPage() {
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
+
+  // Load the department's active employees whenever the department changes
+  useEffect(() => {
+    if (!departmentId) { setDeptEmps([]); return undefined; }
+    let alive = true;
+    setLoadingEmps(true);
+    api.employees({ department: departmentId, status: 'Active' })
+      .then((list) => alive && setDeptEmps(Array.isArray(list) ? list : list.data || []))
+      .catch(() => alive && setDeptEmps([]))
+      .finally(() => alive && setLoadingEmps(false));
+    return () => { alive = false; };
+  }, [departmentId]);
+
+  const empOptions = deptEmps.map((e) => ({
+    value: e._id,
+    label: `${e.employeeId} — ${e.name}`,
+    sub: [e.designation, e.location].filter(Boolean).join(' · ') || undefined,
+  }));
+
+  // Picked from the dropdown -> fill ID, name, designation, location
+  const onPick = (id) => {
+    const e = deptEmps.find((x) => x._id === id);
+    if (e) applyFound(e);
+    else { setFound(null); setEmp(EMPTY_EMP); setLookup({ state: 'idle', message: '' }); }
+  };
 
   const applyFound = (e) => {
     setFound(e);
@@ -91,7 +121,8 @@ export default function AssignPage() {
   const onDepartment = (id) => {
     setDepartmentId(id);
     setFound(null);
-    if (emp.code) check(emp.code, id);
+    if (manual && emp.code) check(emp.code, id);
+    else { setEmp(EMPTY_EMP); setLookup({ state: 'idle', message: '' }); } // pick again from the new department's list
   };
 
   const onCode = (value) => {
@@ -171,7 +202,7 @@ export default function AssignPage() {
     );
   }
 
-  const locked = Boolean(found); // existing employee → details come from their record
+  const locked = Boolean(found) || !manual; // picked from the list → details come from their record
 
   return (
     <div className="max-w-2xl space-y-5">
@@ -194,44 +225,81 @@ export default function AssignPage() {
           )}
 
           <Field label="Employee ID" required>
-            <div className="relative flex flex-col gap-1.5">
-              <div className="flex [&_input]:!rounded-r-none [&_button]:w-[46px] [&_button]:border [&_button]:border-l-0 [&_button]:border-[#D3D9D5] [&_button]:bg-white [&_button]:rounded-r-lg [&_button]:text-muted [&_button]:text-xs [&_button]:font-semibold [&_button]:cursor-pointer [&_button]:grid [&_button]:place-items-center [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-not-allowed">
-                <input
-                  value={emp.code}
-                  onChange={(e) => onCode(e.target.value)}
-                  onFocus={() => suggestions.length && setShowSug(true)}
-                  onBlur={() => setTimeout(() => setShowSug(false), 150)}
-                  placeholder={departmentId ? 'e.g. EMP-00125 or a name' : 'Select department first'}
-                  disabled={!departmentId}
-                  required
-                />
-                <button type="button" onClick={() => check(emp.code)} disabled={!departmentId} aria-label="Find employee">
-                  <Icon name="search" size={16} />
-                </button>
-              </div>
-              {showSug && suggestions.length > 0 && !found && (
-                <div className="absolute top-11 inset-x-0 z-10 overflow-hidden bg-white border border-line rounded-lg shadow-pop [&_button]:flex [&_button]:w-full [&_button]:items-baseline [&_button]:gap-2.5 [&_button]:text-left [&_button]:px-3 [&_button]:py-2.5 [&_button]:border-0 [&_button]:bg-transparent [&_button]:cursor-pointer [&_button:hover]:bg-brand-soft [&_small]:ml-auto [&_small]:text-muted">
-                  {suggestions.map((s) => (
-                    <button type="button" key={s._id} onMouseDown={() => applyFound(s)}>
-                      <span className="font-mono text-[12.5px] tracking-tight">{s.employeeId}</span> {s.name}
-                      <small>{s.designation}</small>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {lookup.state === 'checking' && <span className="field-hint text-xs text-muted">Checking…</span>}
-            {lookup.state === 'found' && <span className="field-hint text-xs text-muted text-ok">✓ Existing employee in {department?.name}</span>}
-            {lookup.state === 'new' && <span className="field-hint text-xs text-muted text-brand">{lookup.message}</span>}
-            {lookup.state === 'mismatch' && (
-              <span className="field-error text-xs text-danger">
-                {lookup.message}{' '}
-                {lookup.employee && (
-                  <button type="button" className="border-0 bg-transparent p-0 text-brand font-semibold text-xs underline cursor-pointer" onClick={() => { setDepartmentId(lookup.employee.department._id); applyFound(lookup.employee); }}>
-                    Switch to {lookup.employee.department?.name}
-                  </button>
+            {!manual ? (
+              <div className="flex flex-col gap-1.5">
+                {departmentId ? (
+                  <SearchSelect
+                    options={empOptions}
+                    value={found?._id || ''}
+                    onChange={onPick}
+                    loading={loadingEmps}
+                    placeholder={`Search ${department?.name || ''} employees by ID or name…`}
+                    emptyText="No active employees in this department"
+                    required
+                  />
+                ) : (
+                  <input disabled placeholder="Select department first" />
                 )}
-              </span>
+                {departmentId && !loadingEmps && (
+                  <span className="text-xs text-muted">
+                    {found ? <span className="text-ok">✓ {found.name} selected — details filled in below</span>
+                      : `${deptEmps.length} active employee${deptEmps.length === 1 ? '' : 's'} in ${department?.name || 'this department'}`}
+                    {!crm.enabled && (
+                      <>
+                        {' · '}
+                        <button type="button" className="border-0 bg-transparent p-0 text-brand font-semibold text-xs underline cursor-pointer" onClick={() => { setManual(true); setFound(null); setEmp(EMPTY_EMP); setLookup({ state: 'idle', message: '' }); }}>
+                          New employee ID
+                        </button>
+                      </>
+                    )}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <>
+              <div className="relative flex flex-col gap-1.5">
+                <div className="flex [&_input]:!rounded-r-none [&_button]:w-[46px] [&_button]:border [&_button]:border-l-0 [&_button]:border-[#D3D9D5] [&_button]:bg-white [&_button]:rounded-r-lg [&_button]:text-muted [&_button]:text-xs [&_button]:font-semibold [&_button]:cursor-pointer [&_button]:grid [&_button]:place-items-center [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-not-allowed">
+                  <input
+                    value={emp.code}
+                    onChange={(e) => onCode(e.target.value)}
+                    onFocus={() => suggestions.length && setShowSug(true)}
+                    onBlur={() => setTimeout(() => setShowSug(false), 150)}
+                    placeholder={departmentId ? 'e.g. EMP-00125 or a name' : 'Select department first'}
+                    disabled={!departmentId}
+                    required
+                  />
+                  <button type="button" onClick={() => check(emp.code)} disabled={!departmentId} aria-label="Find employee">
+                    <Icon name="search" size={16} />
+                  </button>
+                </div>
+                {showSug && suggestions.length > 0 && !found && (
+                  <div className="absolute top-11 inset-x-0 z-10 overflow-hidden bg-white border border-line rounded-lg shadow-pop [&_button]:flex [&_button]:w-full [&_button]:items-baseline [&_button]:gap-2.5 [&_button]:text-left [&_button]:px-3 [&_button]:py-2.5 [&_button]:border-0 [&_button]:bg-transparent [&_button]:cursor-pointer [&_button:hover]:bg-brand-soft [&_small]:ml-auto [&_small]:text-muted">
+                    {suggestions.map((s) => (
+                      <button type="button" key={s._id} onMouseDown={() => applyFound(s)}>
+                        <span className="font-mono text-[12.5px] tracking-tight">{s.employeeId}</span> {s.name}
+                        <small>{s.designation}</small>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {lookup.state === 'checking' && <span className="field-hint text-xs text-muted">Checking…</span>}
+              {lookup.state === 'found' && <span className="field-hint text-xs text-muted text-ok">✓ Existing employee in {department?.name}</span>}
+              {lookup.state === 'new' && <span className="field-hint text-xs text-muted text-brand">{lookup.message}</span>}
+              {lookup.state === 'mismatch' && (
+                <span className="field-error text-xs text-danger">
+                  {lookup.message}{' '}
+                  {lookup.employee && (
+                    <button type="button" className="border-0 bg-transparent p-0 text-brand font-semibold text-xs underline cursor-pointer" onClick={() => { setDepartmentId(lookup.employee.department._id); applyFound(lookup.employee); }}>
+                      Switch to {lookup.employee.department?.name}
+                    </button>
+                  )}
+                </span>
+              )}
+                <button type="button" className="field-hint border-0 bg-transparent p-0 text-left text-brand font-semibold text-xs underline cursor-pointer" onClick={() => { setManual(false); setFound(null); setEmp(EMPTY_EMP); setLookup({ state: 'idle', message: '' }); }}>
+                  ← Pick from the list
+                </button>
+              </>
             )}
           </Field>
 
