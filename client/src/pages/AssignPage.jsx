@@ -133,6 +133,17 @@ export default function AssignPage() {
   };
 
   const item = items?.find((i) => i._id === itemId);
+  // Item dropdown: active items, in-stock first; name + brand/model + category searchable, out of stock greyed out
+  const itemOptions = (items || [])
+    .filter((i) => i.status !== 'Inactive')
+    .sort((a, b) => (b.availableQuantity > 0) - (a.availableQuantity > 0) || a.name.localeCompare(b.name))
+    .map((i) => ({
+      value: i._id,
+      label: i.name,
+      sub: [i.category, i.subCategory, i.brand && i.brand !== i.name ? i.brand : '', i.availableQuantity > 0 ? `${i.availableQuantity} ${i.unit || 'pcs'} available` : 'Out of stock']
+        .filter(Boolean).join(' · '),
+      disabled: i.availableQuantity < 1,
+    }));
   const tooMany = item && Number(quantity) > item.availableQuantity;
   const employeeReady = departmentId && emp.code.trim() && emp.name.trim() && (lookup.state === 'found' || lookup.state === 'new');
   const department = departments?.find((d) => d._id === departmentId);
@@ -323,14 +334,15 @@ export default function AssignPage() {
           <hr className="border-0 border-t border-line my-1" />
 
           <Field label="Item" required>
-            <select value={itemId} onChange={(e) => setItemId(e.target.value)} required>
-              <option value="">Select item…</option>
-              {(items || []).filter((i) => i.status !== 'Inactive').map((i) => (
-                <option key={i._id} value={i._id} disabled={i.availableQuantity < 1}>
-                  {i.name} (Available: {i.availableQuantity})
-                </option>
-              ))}
-            </select>
+            <SearchSelect
+              options={itemOptions}
+              value={itemId}
+              onChange={setItemId}
+              loading={!items}
+              placeholder="Search item by name, brand or category…"
+              emptyText="No item matches"
+              required
+            />
           </Field>
           <Field label="Quantity" required hint={item ? `${item.availableQuantity} ${item.unit} available` : undefined}>
             <input

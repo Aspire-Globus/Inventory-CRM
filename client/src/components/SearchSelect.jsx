@@ -3,7 +3,8 @@ import Icon from './Icons.jsx';
 
 /**
  * A dropdown you can type into to filter (for long lists: employees, items).
- * options: [{ value, label, sub? }]  — label is shown and searched; sub is a second grey line (also searched)
+ * options: [{ value, label, sub?, disabled? }]  — label is shown and searched; sub is a second grey line (also searched);
+ *          disabled options are shown greyed out and can't be picked (e.g. out of stock)
  */
 export default function SearchSelect({ options = [], value, onChange, placeholder = 'Search…', loading, emptyText = 'Nothing found', required }) {
   const [open, setOpen] = useState(false);
@@ -28,6 +29,7 @@ export default function SearchSelect({ options = [], value, onChange, placeholde
   useEffect(() => setActive(0), [text]);
 
   const choose = (o) => {
+    if (o.disabled) return;
     onChange(o.value);
     setText('');
     setOpen(false);
@@ -85,7 +87,8 @@ export default function SearchSelect({ options = [], value, onChange, placeholde
                 onMouseEnter={() => setActive(i)}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => choose(o)}
-                className={`w-full flex flex-col items-start px-3 py-2 border-0 text-left cursor-pointer ${i === active ? 'bg-[#E6F2EF]' : 'bg-transparent'}`}
+                aria-disabled={o.disabled || undefined}
+                className={`w-full flex flex-col items-start px-3 py-2 border-0 text-left ${o.disabled ? 'opacity-45 cursor-not-allowed' : 'cursor-pointer'} ${i === active && !o.disabled ? 'bg-[#E6F2EF]' : 'bg-transparent'}`}
               >
                 <span className={`text-[14px] ${o.value === value ? 'font-semibold text-brand' : ''}`}>{o.label}</span>
                 {o.sub && <span className="text-[12.5px] text-muted">{o.sub}</span>}
