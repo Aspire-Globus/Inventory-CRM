@@ -69,19 +69,27 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      <div className={`${tw.card} grid grid-cols-5 divide-x divide-line max-lg:grid-cols-3 max-lg:divide-x-0 max-sm:grid-cols-2`}>
+      <div className={`${tw.card} grid grid-cols-6 divide-x divide-line max-xl:grid-cols-3 max-xl:divide-x-0 max-sm:grid-cols-2`}>
         {[
           ['Total stock', totals.total],
           ['With employees', totals.assigned],
+          ['Damaged / in repair', totals.repair || 0, '/repairs'],
           ['On the shelf', totals.available],
           ['Open assignments', activeAssignments],
           ['Departments', departments],
-        ].map(([label, value]) => (
-          <div key={label} className="px-5 py-4">
-            <span className="text-[13px] text-muted">{label}</span>
-            <strong className="block mt-1 text-2xl font-semibold tabular-nums">{value}</strong>
-          </div>
-        ))}
+        ].map(([label, value, to]) => {
+          const body = (
+            <>
+              <span className="text-[13px] text-muted">{label}</span>
+              <strong className={`block mt-1 text-2xl font-semibold tabular-nums ${to && value > 0 ? 'text-warn' : ''}`}>{value}</strong>
+            </>
+          );
+          return to ? (
+            <Link key={label} to={to} className="px-5 py-4 text-ink no-underline hover:bg-paper/60" title="Open Repairs">{body}</Link>
+          ) : (
+            <div key={label} className="px-5 py-4">{body}</div>
+          );
+        })}
       </div>
 
       <CategoryCards data={byCategory} />
