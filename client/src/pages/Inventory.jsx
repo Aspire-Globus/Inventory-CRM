@@ -1,5 +1,5 @@
-import { Fragment, useMemo, useState, lazy, Suspense } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Fragment, useMemo, useState, lazy, Suspense, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, downloadCSV, fmtDate } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import Icon from '../components/Icons.jsx';
@@ -468,6 +468,16 @@ export default function Inventory() {
   const [status, setStatus] = useState('Active'); // Active | Inactive | All
   const [openId, setOpenId] = useState(null); // expanded row
   const [modal, setModal] = useState(null); // {type, item}
+  // /inventory?add=<Category> (from Manage Categories): open "Add Inventory Item" with that category chosen
+  const [urlParams, setUrlParams] = useSearchParams();
+  useEffect(() => {
+    const cat = urlParams.get('add');
+    if (cat === null) return;
+    setModal({ type: 'form', category: cat });
+    const next = new URLSearchParams(urlParams);
+    next.delete('add');
+    setUrlParams(next, { replace: true }); // so a refresh doesn't open it again
+  }, [urlParams]); // eslint-disable-line react-hooks/exhaustive-deps
   const { data: items, loading, error, reload } = useAsync(api.items);
   const { names, list: catList, specSummary, icon } = useCategories();
 
@@ -658,7 +668,7 @@ export default function Inventory() {
 
       {modal?.type === 'form' && (
         <Modal title={modal.item ? 'Edit Inventory Item' : 'Add Inventory Item'} onClose={close} width={820}>
-          <ItemForm initial={modal.item} existing={items || []} onSaved={done} onCancel={close} />
+          <ItemForm initial={modal.item || (modal.category ? { category: modal.category } : undefined)} existing={items || []} onSaved={done} onCancel={close} />
         </Modal>
       )}
       {modal?.type === 'import' && (

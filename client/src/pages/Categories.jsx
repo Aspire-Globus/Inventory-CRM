@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import { useCategories, newestFirst, isNewCategory } from '../categories.jsx';
@@ -216,6 +216,9 @@ export default function Categories() {
   const toast = useToast();
   const { can } = useAuth();
   const canDelete = can('delete');
+  const navigate = useNavigate();
+  // Open the Inventory page with "Add Inventory Item" open and this category already chosen
+  const addItemIn = (name) => navigate(`/inventory?add=${encodeURIComponent(name)}`);
   const { list: all, loading, reload } = useCategories();
   const list = newestFirst(all);
   const [modal, setModal] = useState(null); // { cat } | { cat: null } for new
@@ -296,6 +299,7 @@ export default function Categories() {
                     <td className="text-right" onClick={(e) => e.stopPropagation()}>
                       <ActionMenu
                         actions={[
+                          { label: 'Add inventory item', icon: 'plus', onClick: () => addItemIn(c.name) },
                           { label: 'Edit', icon: 'edit', onClick: () => setModal({ cat: c }) },
                           canDelete && { label: 'Delete', icon: 'trash', danger: true, onClick: () => remove(c) },
                         ]}
@@ -309,14 +313,30 @@ export default function Categories() {
         )}
       </section>
 
-      {modal && (
+      {modal?.created && (
+        <Modal title="Category added" onClose={() => setModal(null)} width={480}>
+          <div className="flex flex-col items-center gap-3 py-2 text-center">
+            <div className="grid place-items-center w-12 h-12 rounded-full bg-ok-soft text-ok"><Icon name="check" size={26} /></div>
+            <p className="m-0 text-[15px]"><b>{modal.created.name}</b> is ready.</p>
+            <p className="m-0 text-[13px] text-muted">Add the first item in this category now?</p>
+          </div>
+          <div className={tw.formActions}>
+            <button type="button" className={tw.btn} onClick={() => setModal(null)}>Done</button>
+            <button type="button" className={tw.btnPrimary} onClick={() => addItemIn(modal.created.name)}>
+              <Icon name="plus" size={18} /> Add inventory item
+            </button>
+          </div>
+        </Modal>
+      )}
+      {modal && !modal.created && (
         <Modal title={modal.cat ? `Edit Category — ${modal.cat.name}` : 'Add Category'} onClose={() => setModal(null)} width={820}>
           <CategoryForm
             initial={modal.cat}
             onCancel={() => setModal(null)}
-            onSaved={() => {
-              setModal(null);
+            onSaved={(saved) => {
               reload();
+              // New category -> offer to add an item in it right away; edit -> just close
+              setModal(!modal.cat && saved?.name ? { created: saved } : null);
             }}
           />
         </Modal>
