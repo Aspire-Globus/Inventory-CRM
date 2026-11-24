@@ -6,7 +6,7 @@ import Icon from './Icons.jsx';
  * options: [{ value, label, sub?, disabled? }]  — label is shown and searched; sub is a second grey line (also searched);
  *          disabled options are shown greyed out and can't be picked (e.g. out of stock)
  */
-export default function SearchSelect({ options = [], value, onChange, placeholder = 'Search…', loading, emptyText = 'Nothing found', required }) {
+export default function SearchSelect({ options = [], value, onChange, placeholder = 'Search…', loading, emptyText = 'Nothing found', required, disabled, autoFocus }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [active, setActive] = useState(0);
@@ -14,6 +14,7 @@ export default function SearchSelect({ options = [], value, onChange, placeholde
   const input = useRef(null);
   const listId = useId();
   const selected = options.find((o) => o.value === value);
+  const hasValue = value !== '' && value != null; // an "All …" option with value '' needs no clear button
 
   const words = text.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const shown = options.filter((o) => {
@@ -45,13 +46,15 @@ export default function SearchSelect({ options = [], value, onChange, placeholde
 
   return (
     <div ref={box} className="relative">
-      <div className={`flex items-center gap-2 h-10 px-3 rounded-lg border bg-white ${open ? 'border-brand ring-2 ring-brand/15' : 'border-[#D3D9D5]'}`}>
+      <div className={`flex items-center gap-2 h-10 px-3 rounded-lg border ${disabled ? 'bg-paper opacity-70' : 'bg-white'} ${open ? 'border-brand ring-2 ring-brand/15' : 'border-[#D3D9D5]'}`}>
         <Icon name="search" size={16} className="text-muted shrink-0" />
         <input
           ref={input}
           value={open ? text : selected?.label || ''}
           onChange={(e) => { setText(e.target.value); setOpen(true); }}
           onFocus={() => { setOpen(true); setText(''); }}
+          disabled={disabled}
+          autoFocus={autoFocus}
           onKeyDown={onKey}
           placeholder={selected ? selected.label : placeholder}
           className="flex-1 min-w-0 !border-0 !outline-none !shadow-none !ring-0 !bg-transparent !p-0 !h-auto !rounded-none text-[14px]"
@@ -60,7 +63,7 @@ export default function SearchSelect({ options = [], value, onChange, placeholde
           aria-controls={listId}
           aria-autocomplete="list"
         />
-        {selected && !open ? (
+        {selected && hasValue && !open && !disabled ? (
           <button type="button" aria-label="Clear" className="bg-transparent border-0 p-0.5 text-muted cursor-pointer" onClick={() => { onChange(''); input.current?.focus(); }}>
             <Icon name="x" size={14} />
           </button>
@@ -71,7 +74,7 @@ export default function SearchSelect({ options = [], value, onChange, placeholde
       {/* keeps the browser's "required" check working */}
       {required && <input tabIndex={-1} aria-hidden="true" value={value || ''} onChange={() => {}} required className="absolute inset-x-0 bottom-0 h-px opacity-0 pointer-events-none" />}
 
-      {open && (
+      {open && !disabled && (
         <div id={listId} role="listbox" className="absolute z-30 left-0 right-0 top-[calc(100%+4px)] max-h-60 overflow-y-auto bg-white border border-line rounded-lg shadow-[0_10px_28px_rgba(20,48,44,.16)] py-1">
           {loading ? (
             <div className="px-3 py-3 text-[13px] text-muted">Loading…</div>

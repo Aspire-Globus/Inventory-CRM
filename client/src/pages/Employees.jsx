@@ -7,6 +7,7 @@ import { ActionMenu, Empty, Field, Modal, StatusBadge, useAsync, useToast } from
 import { Pagination, usePagination } from '../components/table.jsx';
 import { CrmBar, useCrm } from '../components/Crm.jsx';
 import { TableSkeleton } from '../components/Skeleton.jsx';
+import SearchSelect from '../components/SearchSelect.jsx';
 import { tw } from '../components/tw.js';
 
 export function EmployeeForm({ initial, onSaved, onCancel }) {
@@ -54,10 +55,7 @@ export function EmployeeForm({ initial, onSaved, onCancel }) {
           <input value={form.name} onChange={set('name')} required autoFocus />
         </Field>
         <Field label="Department" required>
-          <select value={form.department} onChange={set('department')} required>
-            <option value="">Select department…</option>
-            {(departments || []).map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}
-          </select>
+          <SearchSelect options={(departments || []).map((d) => ({ value: d._id, label: d.name }))} value={form.department} onChange={(v) => setForm((f) => ({ ...f, department: v }))} placeholder="Search department…" emptyText="No department matches" required />
         </Field>
         <Field label="Designation">
           <input value={form.designation} onChange={set('designation')} />
@@ -150,10 +148,9 @@ export default function Employees() {
                 placeholder="Search ID or name…"
               />
             </div>
-            <select value={department} onChange={(e) => setDepartment(e.target.value)}>
-              <option value="">All Departments</option>
-              {(departments || []).map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}
-            </select>
+            <div className="w-[220px] max-md:w-full">
+              <SearchSelect options={[{ value: '', label: 'All departments' }, ...(departments || []).map((d) => ({ value: d._id, label: d.name }))]} value={department} onChange={setDepartment} placeholder="All departments" emptyText="No department matches" />
+            </div>
           </div>
         </div>
         {loading ? (

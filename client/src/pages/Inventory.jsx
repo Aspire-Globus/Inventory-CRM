@@ -12,6 +12,7 @@ import { useCategories, newestFirst } from '../categories.jsx';
 import { BulkBar, CheckAll, CheckCell, Pagination, SortTh, usePagination, useSelection, useSort } from '../components/table.jsx';
 import { tw } from '../components/tw.js';
 import { ListSkeleton, TableSkeleton } from '../components/Skeleton.jsx';
+import SearchSelect from '../components/SearchSelect.jsx';
 import { useUrlParam } from '../components/useUrlParam.js';
 
 // Item form -> multipart/form-data. The picture goes as a real file in field "image";
@@ -36,10 +37,15 @@ function toFormData(body, file, removeImage) {
 function Pick({ value, options, onChange, placeholder = 'Select…', required, disabled }) {
   const opts = value && !options.includes(value) ? [value, ...options] : options;
   return (
-    <select value={value} required={required} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{placeholder}</option>
-      {opts.map((o) => <option key={o}>{o}</option>)}
-    </select>
+    <SearchSelect
+      options={opts.map((o) => ({ value: o, label: o }))}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      required={required}
+      disabled={disabled}
+      emptyText="Nothing matches"
+    />
   );
 }
 
@@ -294,21 +300,18 @@ function AddStock({ item: fixedItem, items = [], onDone, onCancel }) {
     <form onSubmit={submit} className={tw.form}>
       {!fixedItem && (
         <Field label="Item" required>
-          <select value={itemId} onChange={(e) => setItemId(e.target.value)} required autoFocus>
-            <option value="">Select existing item…</option>
-            {[...names, ...new Set(items.map((i) => i.category).filter((c) => !names.includes(c)))].map((c) => {
-              const group = items.filter((i) => i.category === c);
-              return group.length ? (
-                <optgroup key={c} label={c}>
-                  {group.map((i) => (
-                    <option key={i._id} value={i._id}>
-                      {i.name}{i.subCategory ? ` (${i.subCategory})` : ''} — Total {i.totalQuantity}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null;
-            })}
-          </select>
+          <SearchSelect
+            options={items
+              .filter((i) => i.status !== 'Inactive')
+              .sort((x, y) => x.name.localeCompare(y.name))
+              .map((i) => ({ value: i._id, label: i.name, sub: [i.category, i.subCategory, `Total ${i.totalQuantity}`].filter(Boolean).join(' · ') }))}
+            value={itemId}
+            onChange={setItemId}
+            placeholder="Search existing item…"
+            emptyText="No item matches"
+            required
+            autoFocus
+          />
         </Field>
       )}
       {item && (
@@ -543,10 +546,9 @@ export default function Inventory() {
               <Icon name="search" size={16} />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items…" />
             </div>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="All">All Categories</option>
-              {names.map((c) => <option key={c}>{c}</option>)}
-            </select>
+            <div className="w-[200px] max-md:w-full">
+              <SearchSelect options={[{ value: 'All', label: 'All Categories' }, ...names.map((c) => ({ value: c, label: c }))]} value={category} onChange={(v) => setCategory(v || 'All')} placeholder="All Categories" emptyText="No category matches" />
+            </div>
             <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
               <option value="Active">Active items</option>
               <option value="Inactive">Inactive items</option>

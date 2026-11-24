@@ -11,6 +11,7 @@ import { BulkBar, CheckAll, CheckCell, Pagination, SortTh, usePagination, useSel
 import { Empty, Field, Modal, StatusBadge, assignmentStatus, useAsync, useToast } from '../components/ui.jsx';
 import { tw } from '../components/tw.js';
 import { TableSkeleton } from '../components/Skeleton.jsx';
+import SearchSelect from '../components/SearchSelect.jsx';
 import { useUrlParam } from '../components/useUrlParam.js';
 
 const canReturn = (a) => a.outstandingQuantity > 0;
@@ -115,10 +116,9 @@ export default function Assignments() {
             ))}
           </div>
           <div className={tw.filters}>
-            <select value={department} onChange={(e) => setDepartment(e.target.value)} aria-label="Department">
-              <option value="">All departments</option>
-              {(departments || []).map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}
-            </select>
+            <div className="w-[220px] max-md:w-full">
+              <SearchSelect options={[{ value: '', label: 'All departments' }, ...(departments || []).map((d) => ({ value: d._id, label: d.name }))]} value={department} onChange={setDepartment} placeholder="All departments" emptyText="No department matches" />
+            </div>
             <div className={tw.search}>
               <Icon name="search" size={16} />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Employee, ID or item…" />

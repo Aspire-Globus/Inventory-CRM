@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { api, fmtDate, today } from '../api.js';
 import { Field, useAsync, useToast } from './ui.jsx';
+import SearchSelect from './SearchSelect.jsx';
 import { tw } from './tw.js';
 
 // Move an item straight from its current holder to another employee
@@ -53,10 +54,7 @@ export default function ReassignForm({ assignment, onDone, onCancel }) {
 
       <div className={tw.grid2}>
         <Field label="Give to — Department" required>
-          <select value={departmentId} onChange={(e) => { setDepartmentId(e.target.value); setEmployeeId(''); setQ(''); }} required autoFocus>
-            <option value="">Select department…</option>
-            {(departments || []).map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}
-          </select>
+          <SearchSelect options={(departments || []).map((d) => ({ value: d._id, label: d.name }))} value={departmentId} onChange={(v) => { setDepartmentId(v); setEmployeeId(''); setQ(''); }} loading={!departments} placeholder="Search department…" emptyText="No department matches" required autoFocus />
         </Field>
         <Field label="Quantity" required hint={holding > 1 ? `Up to ${holding} — the rest stays with ${assignment.employeeName}` : undefined}>
           <input type="number" min="1" max={holding} step="1" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} required />
@@ -64,13 +62,16 @@ export default function ReassignForm({ assignment, onDone, onCancel }) {
       </div>
 
       <Field label="Give to — Employee" required hint={departmentId && !loadingEmp && !(employees || []).length ? 'No active employees in this department.' : undefined}>
-        <div className="flex flex-col gap-2">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={departmentId ? 'Search name or Employee ID…' : 'Select department first'} disabled={!departmentId} />
-          <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required disabled={!departmentId} size={departmentId && options.length ? Math.min(6, options.length + 1) : undefined} className="!h-auto min-h-10 py-1">
-            <option value="">{loadingEmp ? 'Loading…' : `Select employee… (${options.length})`}</option>
-            {options.map((e) => <option key={e._id} value={e._id}>{e.name} — {e.employeeId}{e.designation ? ` · ${e.designation}` : ''}</option>)}
-          </select>
-        </div>
+        <SearchSelect
+          options={options.map((e) => ({ value: e._id, label: `${e.employeeId} — ${e.name}`, sub: [e.designation, e.location].filter(Boolean).join(' · ') || undefined }))}
+          value={employeeId}
+          onChange={setEmployeeId}
+          loading={loadingEmp}
+          disabled={!departmentId}
+          placeholder={departmentId ? 'Search employee by ID or name…' : 'Select department first'}
+          emptyText="No active employee matches"
+          required
+        />
       </Field>
 
       <div className={tw.grid2}>

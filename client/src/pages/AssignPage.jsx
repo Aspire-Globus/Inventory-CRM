@@ -226,10 +226,7 @@ export default function AssignPage() {
       <section className={tw.cardPad}>
         <form onSubmit={submit} className="flex flex-col gap-4 [&_.field]:grid [&_.field]:grid-cols-[170px_1fr] [&_.field]:items-center [&_.field]:gap-3 [&_.field-hint]:col-start-2 [&_.field-hint]:-mt-2 [&_.field-error]:col-start-2 [&_.field-error]:-mt-2 [&_.info-box]:ml-[182px] max-md:[&_.field]:grid-cols-1 max-md:[&_.field]:gap-1.5 max-md:[&_.field-hint]:col-start-1 max-md:[&_.field-hint]:mt-0 max-md:[&_.field-error]:col-start-1 max-md:[&_.field-error]:mt-0 max-md:[&_.info-box]:ml-0">
           <Field label="Department" required>
-            <select value={departmentId} onChange={(e) => onDepartment(e.target.value)} required autoFocus>
-              <option value="">Select department…</option>
-              {(departments || []).map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}
-            </select>
+            <SearchSelect options={(departments || []).map((d) => ({ value: d._id, label: d.name }))} value={departmentId} onChange={onDepartment} loading={!departments} placeholder="Search department…" emptyText="No department matches" required autoFocus />
           </Field>
           {departments && !departments.length && (
             <p className="bg-warn-soft text-warn px-3 py-2.5 rounded-lg m-0">No departments yet — <Link to="/departments">add a department</Link> first.</p>
