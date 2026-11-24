@@ -90,6 +90,9 @@ export function ActionMenu({ actions }) {
     };
   }, [pos]);
 
+  // Nothing to do on this row (e.g. an inactive employee): no ⋮ button at all
+  if (!items.length) return null;
+
   return (
     <div className="relative inline-block">
       <button ref={btnRef} className={tw.iconBtn} onClick={() => (pos ? setPos(null) : open())} aria-label="Actions" aria-expanded={!!pos}>
