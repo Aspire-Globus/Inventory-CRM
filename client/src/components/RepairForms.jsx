@@ -4,6 +4,7 @@ import { Field, StatusBadge, useAsync, useToast } from './ui.jsx';
 import { tw } from './tw.js';
 import { ListSkeleton } from './Skeleton.jsx';
 import SearchSelect from './SearchSelect.jsx';
+import Img from './Img.jsx';
 
 // Same list as the server (GET /api/repairs/options)
 export const DAMAGE_TYPES = ['Screen broken', 'Body damage', "Won't turn on", 'Keys / ports', 'Water damage', 'Software'];
@@ -491,7 +492,7 @@ export function RepairDetails({ id }) {
         <div><dt>From</dt><dd>{r.employeeName ? `${r.employeeName} (${r.employeeCode}) · ${r.departmentName}` : 'Office stock'}</dd></div>
         <div><dt>Status</dt><dd><StatusBadge status={r.status} />{r.overdueDays > 0 && <span className="ml-2 text-danger text-[12.5px] font-semibold">Overdue {r.overdueDays} day(s)</span>}</dd></div>
       </dl>
-      {r.photo && <img src={r.photo} alt="Damage" className="max-h-56 w-fit rounded-lg border border-line" />}
+      <Img src={r.photo} alt="Damage" className="max-h-56 w-fit rounded-lg border border-line" />
       <ol className="m-0 p-0 list-none flex flex-col gap-3">
         {steps.map((s, i) => (
           <li key={i} className="flex gap-3">

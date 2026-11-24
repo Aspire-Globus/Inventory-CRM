@@ -14,6 +14,7 @@ import { tw } from '../components/tw.js';
 import { ListSkeleton, TableSkeleton } from '../components/Skeleton.jsx';
 import SearchSelect from '../components/SearchSelect.jsx';
 import { useUrlParam } from '../components/useUrlParam.js';
+import Img from '../components/Img.jsx';
 
 // Item form -> multipart/form-data. The picture goes as a real file in field "image";
 // specs (an object) is sent as a JSON string.
@@ -69,7 +70,7 @@ export function ItemForm({ initial, existing = [], onSaved, onCancel }) {
     purchaseDate: toDateInput(initial?.purchaseDate),
     warrantyUntil: toDateInput(initial?.warrantyUntil),
     description: initial?.description || '',
-    image: initial?.image || '',
+    image: /\/static\/default-item\.png$/.test(initial?.image || '') ? '' : initial?.image || '', // missing file -> no picture
   });
   const [nameTouched, setNameTouched] = useState(editing);
   const [saving, setSaving] = useState(false);
@@ -236,7 +237,7 @@ export function ItemForm({ initial, existing = [], onSaved, onCancel }) {
         </Field>
         <div className="flex flex-col gap-1.5">
           <label className="flex flex-col items-center justify-center gap-2 h-[170px] p-3 rounded-xl border border-dashed border-[#C9D2CD] bg-paper text-muted text-center cursor-pointer hover:border-brand [&_img]:max-w-full [&_img]:max-h-[100px] [&_img]:object-contain">
-            {form.image ? <img src={form.image} alt="" /> : <Icon name="image" size={40} />}
+            <Img src={form.image} fallback={<Icon name="image" size={40} />} />
             <span className="text-brand font-medium">{form.image ? 'Change Image' : 'Upload Image'}</span>
             <span className="text-[11.5px]">{Object.values(IMAGE_TYPES).join(', ')} · max {IMAGE_MAX_MB} MB</span>
             <input
@@ -607,7 +608,7 @@ export default function Inventory() {
                     <td className="text-muted">{(pg.page - 1) * pg.size + idx + 1}</td>
                     <td>
                       <div className={tw.itemCell}>
-                        {i.image ? <img src={i.image} alt="" /> : <Icon name={icon(i.category)} size={22} className="text-brand" />}
+                        <Img src={i.image} fallback={<Icon name={icon(i.category)} size={22} className="text-brand" />} />
                         <div>
                           {i.name}
                           <small>{[i.subCategory, i.brand && i.model ? `${i.brand} ${i.model}` : i.brand].filter(Boolean).join(' · ')}</small>

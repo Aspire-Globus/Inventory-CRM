@@ -4,6 +4,7 @@ import { useAsync } from './ui.jsx';
 import { money } from './RepairForms.jsx';
 import { ListSkeleton } from './Skeleton.jsx';
 import { tw } from './tw.js';
+import Img from './Img.jsx';
 
 const monthStart = () => {
   const d = new Date();
@@ -65,7 +66,7 @@ export default function RepairBoard({ search, reloadKey, canEdit, onAction }) {
           <CardBox key={r._id} onOpen={() => onAction({ type: 'view', repair: r })}>
             <div className="flex gap-3">
               <div className="w-14 h-14 rounded-lg bg-[#EEF0EC] shrink-0 overflow-hidden grid place-items-center">
-                {r.photo ? <img src={r.photo} alt="" className="w-full h-full object-cover" /> : <Icon name="image" size={22} className="text-[#8E9A95]" />}
+                <Img src={r.photo} className="w-full h-full object-cover" fallback={<Icon name="image" size={22} className="text-[#8E9A95]" />} />
               </div>
               <div className="flex flex-col gap-0.5 min-w-0">
                 <b className="text-[15px] font-semibold truncate">{r.quantity > 1 ? `${r.quantity} × ` : ''}{r.itemName}</b>

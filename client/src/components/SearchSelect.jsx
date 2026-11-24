@@ -98,9 +98,6 @@ export default function SearchSelect({ options = [], value, onChange, placeholde
               </button>
             ))
           )}
-          {!loading && options.length > 0 && (
-            <div className="px-3 pt-1.5 mt-1 border-t border-line text-[11.5px] text-muted">{shown.length} of {options.length} · type to filter</div>
-          )}
         </div>
       )}
     </div>
